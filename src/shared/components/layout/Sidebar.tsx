@@ -52,7 +52,7 @@ export function Sidebar() {
     <motion.aside
       className={cn(
         'fixed left-0 top-0 h-screen z-50',
-        'glass flex flex-col',
+        'glass hidden md:flex flex-col',
         'transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]'
       )}
       animate={{ width: collapsed ? 72 : 256 }}

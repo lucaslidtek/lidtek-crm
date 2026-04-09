@@ -345,7 +345,23 @@ Mouse follow: w-600px h-600px bg-primary/20 blur-[120px] mix-blend-screen (deskt
 
 ---
 
-## 11. Regras de Ouro
+## 11. Padrões Mobile PWA
+
+O sistema implementa uma interface híbrida para suportar visão nativa em dispositivos móveis (App-like feel).
+
+### Navegação (Mobile)
+- **Bottom Navigation**: Substitui a Sidebar convencional. Elemento *fixed* na parte inferior.
+- **TopBar (Mobile Header)**: Ganha comportamento de *App Bar* com botão "Voltar" (contextual) na esquerda, Título dinâmico no meio, e Botões de ação à direita. 
+- **Ocultação**: Sidebar é exclusividade de viewports `md` (desktop e tablets horizontais). Em celular, a Sidebar não é renderizada (`hidden md:flex`).
+
+### Safe Areas (Notch & Home Indicator)
+Todos os elementos de navegação móvel DEVEM respeitar o Safe Area nativo usando variáveis CSS de ambiente nativas (`env()`):
+- **Header**: Utilização de `pt-[max(env(safe-area-inset-top),0px)]` na TopBar.
+- **Bottom Navigation**: Utilização de `pb-[max(calc(env(safe-area-inset-bottom)+0.5rem),0.5rem)]`.
+
+---
+
+## 12. Regras de Ouro
 
 1. **Dark mode é o padrão** — o sistema abre em `.dark`
 2. **Nunca use cores puras** — sempre com opacidade (`white/70`, `primary/20`)
