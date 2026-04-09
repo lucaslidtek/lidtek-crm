@@ -210,7 +210,7 @@ export function KanbanBoard<T extends { id: string }>({
 
       <DragOverlay dropAnimation={null}>
         {activeItem ? (
-          <div className="w-[276px] opacity-95 shadow-2xl shadow-black/20 rounded-lg rotate-[2deg] scale-[1.03]">
+          <div className="w-[284px] glass rounded-lg p-3 opacity-95 shadow-2xl shadow-black/20 rotate-[2deg] scale-[1.03] cursor-grabbing">
             {renderCard(activeItem)}
           </div>
         ) : null}
