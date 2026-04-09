@@ -22,10 +22,21 @@ export function KanbanCard({ id, children, onClick }: KanbanCardProps) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition ?? undefined,
-    // Prevent card from disappearing during cross-column drag
-    opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 10 : undefined,
   };
+
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="rounded-lg bg-black/10 dark:bg-white/5"
+      >
+        <div className="opacity-0 pointer-events-none">
+          {children}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

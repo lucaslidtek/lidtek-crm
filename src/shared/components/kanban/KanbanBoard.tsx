@@ -208,10 +208,7 @@ export function KanbanBoard<T extends { id: string }>({
         ))}
       </div>
 
-      <DragOverlay dropAnimation={{
-        duration: 200,
-        easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-      }}>
+      <DragOverlay dropAnimation={null}>
         {activeItem ? (
           <div className="w-[276px] opacity-95 shadow-2xl shadow-black/20 rounded-lg rotate-[2deg] scale-[1.03]">
             {renderCard(activeItem)}
