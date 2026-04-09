@@ -1,9 +1,9 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import type { User } from '@/shared/types/models';
 import { supabase } from '@/shared/lib/supabase';
 
 // ============================================
-// AUTH — Supabase Google OAuth
+// AUTH — Supabase Google OAuth (PKCE-safe)
 // ============================================
 
 const AUTH_STORAGE_KEY = 'lidtek-crm-auth';
@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-/** Build a User from Supabase auth token metadata (no DB query needed). */
+/** Build a User instantly from the JWT metadata — no DB query needed. */
 function authUserToProfile(authUser: { id: string; email?: string; user_metadata?: Record<string, string> }): User {
   const meta = authUser.user_metadata ?? {};
   const fullName = meta['full_name'] ?? meta['name'] ?? authUser.email ?? 'Usuário';
@@ -48,14 +48,24 @@ function authUserToProfile(authUser: { id: string; email?: string; user_metadata
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Guard so we only call setIsLoading(false) once — prevents race between
+  // getSession() and the INITIAL_SESSION event from onAuthStateChange.
+  const loadingResolved = useRef(false);
+
+  const resolveLoading = useCallback(() => {
+    if (!loadingResolved.current) {
+      loadingResolved.current = true;
+      setIsLoading(false);
+    }
+  }, []);
 
   const loadProfile = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
-    // Always build from auth metadata first (instant, no network needed)
+    // Set user immediately from JWT metadata (no network round-trip)
     const fallback = authUserToProfile(authUser);
     setUser(fallback);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
 
-    // Then try to enrich with full profile row (optional)
+    // Optionally enrich from the profiles table row
     try {
       const { data } = await supabase
         .from('profiles')
@@ -79,29 +89,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
       }
     } catch {
-      // Silently ignore — fallback from auth metadata is already set
+      // Ignore — fallback is already set
     }
   }, []);
 
   useEffect(() => {
-    // Use ONLY onAuthStateChange — it fires INITIAL_SESSION on mount
-    // with the current session, so there is no need for a separate getSession() call.
-    // This eliminates the race condition between two concurrent auth paths.
+    let mounted = true;
+
+    // ---- Step 1: getSession() ----
+    // In PKCE flow (production), this call exchanges the ?code= param from
+    // the URL for a real session token. MUST be called before relying on
+    // onAuthStateChange for the initial state.
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      if (session?.user) {
+        await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+      } else {
+        setUser(null);
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
+      resolveLoading();
+    }).catch(() => {
+      if (mounted) resolveLoading();
+    });
+
+    // ---- Step 2: onAuthStateChange ----
+    // Handles SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED after the initial load.
+    // Does NOT call resolveLoading() — getSession() owns that responsibility.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
+        if (!mounted) return;
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
           await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-        } else {
+        } else if (event === 'SIGNED_OUT') {
           setUser(null);
           localStorage.removeItem(AUTH_STORAGE_KEY);
         }
-        // Always mark loading done after the FIRST event (INITIAL_SESSION)
-        setIsLoading(false);
+        // Always ensure loading is resolved (safety net for edge cases)
+        resolveLoading();
       }
     );
 
-    return () => { subscription.unsubscribe(); };
-  }, [loadProfile]);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [loadProfile, resolveLoading]);
 
   const login = useCallback(() => {
     supabase.auth.signInWithOAuth({
