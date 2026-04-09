@@ -1,0 +1,19 @@
+/* ============================================
+   FONTS — Lidtek CRM
+   
+   Display: TT Hoves Pro (Variable font, local)
+   Body: Work Sans (Google Fonts)
+   ============================================ */
+
+/* @import must come first */
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* TT Hoves Pro — Variable font (all weights 100-900) */
+@font-face {
+  font-family: 'TT Hoves Pro';
+  src: url('/fonts/TTHovesProVariable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
