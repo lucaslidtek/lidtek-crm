@@ -111,6 +111,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
       } else {
+        // ------- DEV AUTO-LOGIN HACK -------
+        if (import.meta.env.DEV && import.meta.env.VITE_DEV_PASSWORD) {
+          try {
+            const res = await supabase.auth.signInWithPassword({
+              email: 'lucas@lidtek.com.br',
+              password: import.meta.env.VITE_DEV_PASSWORD
+            });
+            // Se logar com sucesso, o evento onAuthStateChange vai automaticamente capturar e finalizar o Loading!
+            if (res.data?.session) return;
+          } catch (err) {
+            console.error('Silenced dev auto-login failure:', err);
+          }
+        }
+        // ------------------------------------
+
         setUser(null);
         localStorage.removeItem(AUTH_STORAGE_KEY);
       }
