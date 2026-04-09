@@ -96,6 +96,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    // Safety net: if nothing resolves in 5s, force loading=false
+    // so the user sees the login page instead of an infinite spinner
+    const safetyTimeout = setTimeout(() => {
+      if (mounted) resolveLoading();
+    }, 5000);
+
     // ---- Step 1: getSession() ----
     // In PKCE flow (production), this call exchanges the ?code= param from
     // the URL for a real session token. MUST be called before relying on
@@ -115,7 +121,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // ---- Step 2: onAuthStateChange ----
     // Handles SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED after the initial load.
-    // Does NOT call resolveLoading() — getSession() owns that responsibility.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
@@ -132,9 +137,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, [loadProfile, resolveLoading]);
+
 
   const login = useCallback(() => {
     supabase.auth.signInWithOAuth({
