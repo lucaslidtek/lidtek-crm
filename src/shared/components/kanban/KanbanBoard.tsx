@@ -24,6 +24,7 @@ interface KanbanBoardProps<T extends { id: string }> {
   onMoveItem: (itemId: string, fromColumn: string, toColumn: string) => void;
   renderCard: (item: T) => ReactNode;
   onCardClick?: (item: T) => void;
+  onChangeOrder?: (items: Record<string, T[]>) => void;
 }
 
 // Custom collision detection: prioritize pointerWithin, fallback to rectIntersection
@@ -42,6 +43,7 @@ export function KanbanBoard<T extends { id: string }>({
   onMoveItem,
   renderCard,
   onCardClick,
+  onChangeOrder,
 }: KanbanBoardProps<T>) {
   const [activeItem, setActiveItem] = useState<T | null>(null);
   // Local copy of items for real-time reordering during drag
@@ -133,6 +135,11 @@ export function KanbanBoard<T extends { id: string }>({
     const activeId = String(active.id);
 
     if (over && localItems) {
+      // Dispara o callback para o parent atualizar sua array achatada para prever saltos de UI
+      if (onChangeOrder) {
+        onChangeOrder(localItems);
+      }
+
       const currentColumn = findColumn(activeId, localItems);
       if (currentColumn && currentColumn !== dragFromColumn.current) {
         onMoveItem(activeId, dragFromColumn.current, currentColumn);

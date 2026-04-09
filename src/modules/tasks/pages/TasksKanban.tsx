@@ -14,7 +14,7 @@ export function TasksKanban() {
   const [typeFilter, setTypeFilter] = useState<TaskType | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
   const [createOpen, setCreateOpen] = useState(false);
-  const { tasks } = useStore();
+  const { tasks, reorderTasks } = useStore();
 
   const { tasksByStatus, moveTask } = useTasks({
     type: typeFilter,
@@ -52,6 +52,7 @@ export function TasksKanban() {
         items={tasksByStatus}
         onMoveItem={moveTask}
         renderCard={(task) => <TaskCard task={task} />}
+        onChangeOrder={(items) => reorderTasks(Object.values(items).flat())}
       />
 
       {/* Create Dialog */}

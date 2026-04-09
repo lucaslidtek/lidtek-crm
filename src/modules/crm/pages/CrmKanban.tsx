@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
+import { useStore } from '@/shared/lib/store';
 import { KanbanBoard } from '@/shared/components/kanban/KanbanBoard';
 import { LeadCard } from '@/modules/crm/components/LeadCard';
 import { LeadDetailDrawer } from '@/modules/crm/components/LeadDetailDrawer';
@@ -13,6 +14,7 @@ import type { Lead } from '@/shared/types/models';
 
 export function CrmKanban() {
   const { leads, leadsByStage, moveLead } = useLeads();
+  const { reorderLeads } = useStore();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [view, setView] = useState<ViewType>('kanban');
@@ -48,6 +50,7 @@ export function CrmKanban() {
           onMoveItem={moveLead}
           renderCard={(lead) => <LeadCard lead={lead} />}
           onCardClick={(lead) => setSelectedLeadId(lead.id)}
+          onChangeOrder={(items) => reorderLeads(Object.values(items).flat())}
         />
       ) : (
         <LeadListView 

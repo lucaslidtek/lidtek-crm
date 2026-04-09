@@ -43,6 +43,10 @@ interface StoreActions {
   // Utils
   refreshAll: () => Promise<void>;
   getUserById: (id: string) => User | undefined;
+  // Sorting/Ordering
+  reorderLeads: (leads: Lead[]) => void;
+  reorderTasks: (tasks: Task[]) => void;
+  reorderProjects: (projects: Project[]) => void;
   // Conversion
   convertLeadToProject: (leadId: string, projectType: ProjectType) => Promise<Project>;
 }
@@ -65,15 +69,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refreshLeads = useCallback(async () => {
-    setLeads(await api.leads.list());
+    const fresh = await api.leads.list();
+    setLeads(current => {
+      if (current.length === 0) return fresh;
+      const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
+      return fresh.sort((a, b) => {
+        const orderA = orderMap.get(a.id) ?? 99999;
+        const orderB = orderMap.get(b.id) ?? 99999;
+        return orderA - orderB;
+      });
+    });
   }, []);
 
   const refreshProjects = useCallback(async () => {
-    setProjects(await api.projects.list());
+    const fresh = await api.projects.list();
+    setProjects(current => {
+      if (current.length === 0) return fresh;
+      const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
+      return fresh.sort((a, b) => {
+        const orderA = orderMap.get(a.id) ?? 99999;
+        const orderB = orderMap.get(b.id) ?? 99999;
+        return orderA - orderB;
+      });
+    });
   }, []);
 
   const refreshTasks = useCallback(async () => {
-    setTasks(await api.tasks.list());
+    const fresh = await api.tasks.list();
+    setTasks(current => {
+      if (current.length === 0) return fresh;
+      const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
+      return fresh.sort((a, b) => {
+        const orderA = orderMap.get(a.id) ?? 99999;
+        const orderB = orderMap.get(b.id) ?? 99999;
+        return orderA - orderB;
+      });
+    });
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -219,6 +250,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return project;
   }, [leads, refreshAll]);
 
+  const reorderLeads = useCallback((newLeads: Lead[]) => setLeads(newLeads), []);
+  const reorderProjects = useCallback((newProjects: Project[]) => setProjects(newProjects), []);
+  const reorderTasks = useCallback((newTasks: Task[]) => setTasks(newTasks), []);
+
   return (
     <StoreContext.Provider value={{
       leads, projects, tasks, users, loading,
@@ -233,6 +268,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       refreshUsers, createUser, updateUser, deleteUser,
       getUserById,
       convertLeadToProject,
+      reorderLeads,
+      reorderProjects,
+      reorderTasks,
     }}>
       {children}
     </StoreContext.Provider>

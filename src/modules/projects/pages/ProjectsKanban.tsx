@@ -23,7 +23,7 @@ export function ProjectsKanban() {
   const { projects, projectsByStage } = useProjects(filterType);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [view, setView] = useState<ViewType>('kanban');
-  const { projects: allProjects } = useStore();
+  const { projects: allProjects, reorderProjects } = useStore();
 
   // Always derive the selected project from the live store data
   const selectedProject = selectedProjectId ? allProjects.find(p => p.id === selectedProjectId) ?? null : null;
@@ -63,6 +63,7 @@ export function ProjectsKanban() {
           onMoveItem={() => {}} // Projects don't move by drag — they move by sprint updates
           renderCard={(project) => <ProjectCard project={project} />}
           onCardClick={(project) => setSelectedProjectId(project.id)}
+          onChangeOrder={(items) => reorderProjects(Object.values(items).flat())}
         />
       ) : (
         <ProjectListView 
