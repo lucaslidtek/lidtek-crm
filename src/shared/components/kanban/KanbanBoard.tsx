@@ -134,15 +134,41 @@ export function KanbanBoard<T extends { id: string }>({
     const { active, over } = event;
     const activeId = String(active.id);
 
-    if (over && localItems) {
-      // Dispara o callback para o parent atualizar sua array achatada para prever saltos de UI
-      if (onChangeOrder) {
-        onChangeOrder(localItems);
+    if (!over) {
+      setActiveItem(null);
+      setLocalItems(null);
+      dragFromColumn.current = '';
+      return;
+    }
+
+    const overId = String(over.id);
+    let finalItems = localItems ? { ...localItems } : { ...externalItems };
+
+    const activeColumn = findColumn(activeId, finalItems);
+    const overColumn = findColumn(overId, finalItems);
+
+    if (activeColumn && overColumn) {
+      // Como o handleDragOver já move o item entre colunas, no handleDragEnd 
+      // ambos estarão na mesma coluna base. Fazemos um arrayMove final para definir exata posição.
+      if (activeColumn === overColumn) {
+        const columnArr = [...finalItems[activeColumn]!];
+        const activeIndex = columnArr.findIndex(i => i.id === activeId);
+        const overIndex = columnArr.findIndex(i => i.id === overId);
+
+        if (activeIndex !== overIndex && overIndex !== -1 && activeIndex !== -1) {
+          finalItems[activeColumn] = arrayMove(columnArr, activeIndex, overIndex);
+        }
       }
 
-      const currentColumn = findColumn(activeId, localItems);
-      if (currentColumn && currentColumn !== dragFromColumn.current) {
-        onMoveItem(activeId, dragFromColumn.current, currentColumn);
+      // Dispara o callback para o parent atualizar sua array achatada com a ordem Trello-like final
+      if (onChangeOrder) {
+        onChangeOrder(finalItems);
+      }
+
+      // Se mudou de coluna em relação a COLUNA ORIGINAL (dragFromColumn)
+      const currentFinalColumn = findColumn(activeId, finalItems);
+      if (currentFinalColumn && currentFinalColumn !== dragFromColumn.current) {
+        onMoveItem(activeId, dragFromColumn.current, currentFinalColumn);
       }
     }
 
