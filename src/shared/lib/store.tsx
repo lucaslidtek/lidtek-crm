@@ -250,9 +250,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return project;
   }, [leads, refreshAll]);
 
-  const reorderLeads = useCallback((newLeads: Lead[]) => setLeads(newLeads), []);
-  const reorderProjects = useCallback((newProjects: Project[]) => setProjects(newProjects), []);
-  const reorderTasks = useCallback((newTasks: Task[]) => setTasks(newTasks), []);
+  const reorderLeads = useCallback((reorderedSubset: Lead[]) => {
+    setLeads(current => {
+      const subsetIds = new Set(reorderedSubset.map(i => i.id));
+      const excluded = current.filter(i => !subsetIds.has(i.id));
+      return [...reorderedSubset, ...excluded];
+    });
+  }, []);
+
+  const reorderProjects = useCallback((reorderedSubset: Project[]) => {
+    setProjects(current => {
+      const subsetIds = new Set(reorderedSubset.map(i => i.id));
+      const excluded = current.filter(i => !subsetIds.has(i.id));
+      return [...reorderedSubset, ...excluded];
+    });
+  }, []);
+
+  const reorderTasks = useCallback((reorderedSubset: Task[]) => {
+    setTasks(current => {
+      const subsetIds = new Set(reorderedSubset.map(i => i.id));
+      const excluded = current.filter(i => !subsetIds.has(i.id));
+      return [...reorderedSubset, ...excluded];
+    });
+  }, []);
 
   return (
     <StoreContext.Provider value={{
