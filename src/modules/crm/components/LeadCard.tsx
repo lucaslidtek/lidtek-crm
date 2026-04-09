@@ -1,4 +1,4 @@
-import { Calendar, User as UserIcon, Repeat, Zap } from 'lucide-react';
+import { Calendar, Repeat, Zap } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import type { Lead } from '@/shared/types/models';
 import { useStore } from '@/shared/lib/store';
@@ -64,11 +64,19 @@ export function LeadCard({ lead }: LeadCardProps) {
       <div className="flex items-center justify-between pt-1">
         {/* Owner */}
         {owner && (
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center">
-              <span className="text-[8px] font-bold text-primary">{owner.initials}</span>
+          <div className="relative group/avatar">
+            <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center cursor-default">
+              {owner.avatarUrl ? (
+                <img src={owner.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
+              ) : (
+                <span className="text-[9px] font-bold text-primary">{owner.initials}</span>
+              )}
             </div>
-            <span className="text-[10px] text-foreground-muted">{owner.name.split(' ')[0]}</span>
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-zinc-800 dark:bg-zinc-700 text-white text-[10px] font-medium rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/avatar:opacity-100 transition-opacity shadow-lg">
+              {owner.name}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-800 dark:border-t-zinc-700" />
+            </div>
           </div>
         )}
 

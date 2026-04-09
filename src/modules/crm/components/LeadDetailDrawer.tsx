@@ -31,14 +31,14 @@ const interactionLabels: Record<Interaction['type'], string> = {
 };
 
 export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
-  const { getUserById, updateLead, convertLeadToProject, projects } = useStore();
+  const { getUserById, updateLead, convertLeadToProject, projects, users } = useStore();
   const [, setLocation] = useLocation();
   const [converting, setConverting] = useState(false);
   const [selectedType, setSelectedType] = useState<ProjectType>('oneshot');
 
   if (!lead) return null;
 
-  const owner = getUserById(lead.ownerId);
+
   const stageColor = getStageColor(FUNNEL_STAGES, lead.stage);
   const stageLabel = getStageLabel(FUNNEL_STAGES, lead.stage);
   const isOverdue = lead.nextContactDate && new Date(lead.nextContactDate) < new Date();
@@ -66,6 +66,7 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
     if (field === 'notes') updates.notes = value;
     if (field === 'estimatedValue') updates.estimatedValue = parseFloat(value.replace(/\D/g, '')) || 0;
     if (field === 'solutionType') updates.solutionType = value;
+    if (field === 'ownerId') updates.ownerId = value;
     if (field === 'billingType') {
       updates.billingType = value as BillingType;
       if (value !== 'recurring') updates.billingCycle = undefined;
@@ -171,10 +172,11 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                       label="Origem"
                       value={lead.origin || '—'}
                     />
-                    <FieldCard
-                      icon={<User className="w-3.5 h-3.5" />}
-                      label="Responsável"
-                      value={owner?.name?.split(' ')[0] ?? '—'}
+                    <OwnerFieldCard
+                      ownerId={lead.ownerId}
+                      users={users}
+                      getUserById={getUserById}
+                      onSave={(id) => handleFieldSave('ownerId', id)}
                     />
                     <FieldCard
                       icon={<Calendar className="w-3.5 h-3.5" />}
@@ -566,6 +568,83 @@ function BillingFieldCard({ billingType, billingCycle, onSaveBillingType, onSave
       <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">
         {displayText || <span className="text-zinc-400 font-normal italic">Adicionar...</span>}
       </p>
+    </div>
+  );
+}
+
+/* ═══ Owner Field Card — pick responsible user ═══ */
+function OwnerFieldCard({ ownerId, users, getUserById, onSave }: {
+  ownerId: string;
+  users: { id: string; name: string; initials: string; avatarUrl?: string }[];
+  getUserById: (id: string) => { name: string; initials: string; avatarUrl?: string } | undefined;
+  onSave: (userId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const owner = getUserById(ownerId);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        className="rounded-lg p-2.5 border transition-colors bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800 hover:border-violet-200 dark:hover:border-violet-700 cursor-pointer"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-zinc-400"><User className="w-3.5 h-3.5" /></span>
+          <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Responsável</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {owner ? (
+            <>
+              <div className="w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                {owner.avatarUrl ? (
+                  <img src={owner.avatarUrl} className="w-5 h-5 rounded-full object-cover" alt="" />
+                ) : (
+                  <span className="text-[8px] font-bold text-violet-600 dark:text-violet-400">{owner.initials}</span>
+                )}
+              </div>
+              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{owner.name.split(' ')[0]}</span>
+            </>
+          ) : (
+            <span className="text-sm text-zinc-400 italic">Selecionar...</span>
+          )}
+        </div>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-52 overflow-y-auto">
+          {users.map((u) => (
+            <button
+              key={u.id}
+              className={cn(
+                'w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors cursor-pointer',
+                u.id === ownerId && 'bg-violet-50 dark:bg-violet-950/20 font-medium',
+              )}
+              onClick={() => { onSave(u.id); setOpen(false); }}
+            >
+              <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                {u.avatarUrl ? (
+                  <img src={u.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
+                ) : (
+                  <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400">{u.initials}</span>
+                )}
+              </div>
+              <span className="text-zinc-700 dark:text-zinc-300 truncate">{u.name}</span>
+              {u.id === ownerId && <Check className="w-3.5 h-3.5 text-violet-500 ml-auto flex-shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

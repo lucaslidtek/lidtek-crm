@@ -17,7 +17,7 @@ interface ProjectDetailDrawerProps {
 }
 
 export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerProps) {
-  const { getUserById, leads, updateProject, updateSprint, completeSprint, deleteSprint } = useStore();
+  const { getUserById, leads, updateProject, updateSprint, completeSprint, deleteSprint, users } = useStore();
   const [, setLocation] = useLocation();
 
   if (!project) return null;
@@ -28,10 +28,11 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
     if (field === 'clientName') updates.clientName = value;
     if (field === 'clientContact') updates.clientContact = value;
     if (field === 'clientPhone') updates.clientPhone = value;
+    if (field === 'ownerId') updates.ownerId = value;
     await updateProject(project.id, updates);
   };
 
-  const owner = getUserById(project.ownerId);
+
   const currentSprint = project.sprints.find(s => s.id === project.currentSprintId);
   const linkedLead = leads.find(l => l.id === project.leadId);
   const stageColor = currentSprint ? getStageColor(PROJECT_STAGES, currentSprint.stage) : '#A3A3A3';
@@ -92,7 +93,12 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
 
                   {/* Info cards */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <FieldCard icon={<User className="w-3.5 h-3.5" />} label="Responsável" value={owner?.name?.split(' ')[0] ?? '—'} />
+                    <OwnerFieldCard
+                      ownerId={project.ownerId}
+                      users={users}
+                      getUserById={getUserById}
+                      onSave={(id) => handleFieldSave('ownerId', id)}
+                    />
                     <FieldCard
                       icon={<Phone className="w-3.5 h-3.5" />}
                       label="Telefone"
@@ -391,6 +397,86 @@ function FieldCard({ icon, label, value, alert, editable, onSave, action }: {
         <p className={cn('text-sm font-medium truncate', alert ? 'text-red-600 dark:text-red-400' : 'text-zinc-800 dark:text-zinc-200')}>
           {value || (editable ? <span className="text-zinc-400 font-normal italic">Adicionar...</span> : '—')}
         </p>
+      )}
+    </div>
+  );
+}
+
+/* ═══ Owner Field Card — pick responsible user ═══ */
+function OwnerFieldCard({ ownerId, users, getUserById, onSave }: {
+  ownerId?: string;
+  users: { id: string; name: string; initials: string; avatarUrl?: string }[];
+  getUserById: (id: string) => { name: string; initials: string; avatarUrl?: string } | undefined;
+  onSave: (userId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const owner = ownerId ? getUserById(ownerId) : undefined;
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        className={cn(
+          'rounded-lg p-2.5 border transition-colors bg-zinc-50 dark:bg-zinc-800/50 hover:border-violet-200 dark:hover:border-violet-700 cursor-pointer',
+          !ownerId ? 'border-amber-200 dark:border-amber-800/50' : 'border-zinc-100 dark:border-zinc-800',
+        )}
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className={!ownerId ? 'text-amber-500' : 'text-zinc-400'}><User className="w-3.5 h-3.5" /></span>
+          <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Responsável</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {owner ? (
+            <>
+              <div className="w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                {owner.avatarUrl ? (
+                  <img src={owner.avatarUrl} className="w-5 h-5 rounded-full object-cover" alt="" />
+                ) : (
+                  <span className="text-[8px] font-bold text-violet-600 dark:text-violet-400">{owner.initials}</span>
+                )}
+              </div>
+              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{owner.name.split(' ')[0]}</span>
+            </>
+          ) : (
+            <span className="text-sm text-amber-500 dark:text-amber-400 italic">Sem responsável</span>
+          )}
+        </div>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-52 overflow-y-auto">
+          {users.map((u) => (
+            <button
+              key={u.id}
+              className={cn(
+                'w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors cursor-pointer',
+                u.id === ownerId && 'bg-violet-50 dark:bg-violet-950/20 font-medium',
+              )}
+              onClick={() => { onSave(u.id); setOpen(false); }}
+            >
+              <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                {u.avatarUrl ? (
+                  <img src={u.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
+                ) : (
+                  <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400">{u.initials}</span>
+                )}
+              </div>
+              <span className="text-zinc-700 dark:text-zinc-300 truncate">{u.name}</span>
+              {u.id === ownerId && <Check className="w-3.5 h-3.5 text-violet-500 ml-auto flex-shrink-0" />}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

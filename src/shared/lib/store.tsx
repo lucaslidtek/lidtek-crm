@@ -1,11 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { Lead, Project, Task, User, Sprint, FunnelStage, TaskStatus, ProjectType } from '@/shared/types/models';
 import { api } from '@/shared/lib/supabaseApi';
-import { supabase } from '@/shared/lib/supabase';
+import { useAuth } from '@/app/providers/AuthProvider';
 
 // ============================================
 // STORE — Estado global do app
-// Context API + mockApi
+// Context API + Supabase
+// Data only loads when auth is confirmed (isAuthenticated === true)
 // ============================================
 
 interface StoreState {
@@ -54,6 +55,20 @@ interface StoreActions {
 
 type StoreContextType = StoreState & StoreActions;
 
+// ────────────────────────────────────────────
+// MODULE-LEVEL HMR CACHE
+// Vite HMR remounts React components but does NOT re-execute modules that
+// weren’t edited. This cache lives at module scope — it survives StoreProvider
+// remounts and is used to hydrate useState instantly, so the UI never flashes
+// empty while waiting for a Supabase round-trip.
+// ────────────────────────────────────────────
+let _cache: {
+  leads: Lead[];
+  projects: Project[];
+  tasks: Task[];
+  users: User[];
+} | null = null;
+
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export function useStore(): StoreContextType {
@@ -63,11 +78,15 @@ export function useStore(): StoreContextType {
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  // Initialize from module-level cache so HMR remounts show data instantly
+  const [leads, setLeads] = useState<Lead[]>(() => _cache?.leads ?? []);
+  const [projects, setProjects] = useState<Project[]>(() => _cache?.projects ?? []);
+  const [tasks, setTasks] = useState<Task[]>(() => _cache?.tasks ?? []);
+  const [users, setUsers] = useState<User[]>(() => _cache?.users ?? []);
+  // Start loading=false if we have cached data (HMR) — true only on cold start
+  const [loading, setLoading] = useState(() => _cache === null);
+  const fetchedRef = useRef(false);
 
   const refreshLeads = useCallback(async () => {
     const fresh = await api.leads.list();
@@ -110,35 +129,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
-    // Wait for auth session to be ready before querying — prevents
-    // empty results when the JWT token hasn't been restored yet.
-    await supabase.auth.getSession();
-    const [l, p, t, u] = await Promise.all([
-      api.leads.list(),
-      api.projects.list(),
-      api.tasks.list(),
-      api.users.list(),
-    ]);
-    setLeads(l);
-    setProjects(p);
-    setTasks(t);
-    setUsers(u);
+    try {
+      const u = await api.users.list();
+      const [l, p, t] = await Promise.all([
+        api.leads.list(),
+        api.projects.list(),
+        api.tasks.list(),
+      ]);
+      setUsers(u);
+      setLeads(l);
+      setProjects(p);
+      setTasks(t);
+      // Populate module-level cache so HMR remounts restore data instantly
+      _cache = { leads: l, projects: p, tasks: t, users: u };
+    } catch (err) {
+      console.error('[Store] refreshAll failed:', err);
+    }
     setLoading(false);
   }, []);
 
+  // ─── Auth-driven data loading ───
+  // Only fetch data when auth confirms the user is logged in.
+  // On logout, clear all data. On HMR, if auth is already confirmed
+  // from localStorage cache, data loads immediately.
   useEffect(() => {
-    refreshAll();
+    if (authLoading) return; // Auth still initializing — wait
 
-    // Re-fetch data whenever auth state changes (login, token refresh, etc.)
-    // This guarantees data loads even if the initial refreshAll ran too early.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    if (isAuthenticated) {
+      // If cache is populated (HMR scenario), skip fetch — data already in state
+      if (_cache !== null) {
+        fetchedRef.current = true;
+        return;
+      }
+      // Cold start — fetch from Supabase
+      if (!fetchedRef.current) {
+        fetchedRef.current = true;
         refreshAll();
       }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [refreshAll]);
+    } else {
+      // Logged out — clear everything including cache
+      fetchedRef.current = false;
+      _cache = null;
+      setLeads([]);
+      setProjects([]);
+      setTasks([]);
+      setUsers([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated, authLoading, refreshAll]);
 
   const createLead = useCallback(async (data: Parameters<typeof api.leads.create>[0]) => {
     const lead = await api.leads.create(data);
@@ -246,7 +284,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clientContact: lead.contact,
       type: projectType,
       status: 'active',
-      ownerId: lead.ownerId,
       leadId: lead.id,
     });
 

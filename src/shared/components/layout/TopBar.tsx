@@ -16,7 +16,7 @@ import { useMemo } from 'react';
 export function TopBar() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
 
   // Mapeamento dinâmico do título no celular
   const pageDetails = useMemo(() => {

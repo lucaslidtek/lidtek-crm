@@ -9,7 +9,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   type DragOverEvent,
-  closestCenter,
+  closestCenter as _closestCenter,
   pointerWithin,
   rectIntersection,
   type CollisionDetection,

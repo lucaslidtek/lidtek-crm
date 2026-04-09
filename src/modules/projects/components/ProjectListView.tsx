@@ -28,7 +28,7 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
   return (
     <div className="space-y-3 animate-fade-in">
       {projects.map((project) => {
-        const owner = getUserById(project.ownerId);
+        const owner = project.ownerId ? getUserById(project.ownerId) : undefined;
         const currentSprint = project.sprints.find(s => s.id === project.currentSprintId);
         const completedCount = project.sprints.filter(s => s.status === 'completed').length;
         const isExpanded = expandedIds.has(project.id);

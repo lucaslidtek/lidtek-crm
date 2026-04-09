@@ -10,7 +10,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const { getUserById } = useStore();
-  const owner = getUserById(project.ownerId);
+  const owner = project.ownerId ? getUserById(project.ownerId) : undefined;
   const currentSprint = project.sprints.find(s => s.id === project.currentSprintId);
   const isDeliverySoon = project.nextDeliveryDate && 
     (new Date(project.nextDeliveryDate).getTime() - Date.now()) < 7 * 86400000 &&
@@ -35,12 +35,23 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-1">
-        {owner && (
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center">
-              <span className="text-[8px] font-bold text-primary">{owner.initials}</span>
+        {owner ? (
+          <div className="relative group/avatar">
+            <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center cursor-default">
+              {owner.avatarUrl ? (
+                <img src={owner.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
+              ) : (
+                <span className="text-[9px] font-bold text-primary">{owner.initials}</span>
+              )}
             </div>
-            <span className="text-[10px] text-foreground-muted">{owner.name.split(' ')[0]}</span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-zinc-800 dark:bg-zinc-700 text-white text-[10px] font-medium rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/avatar:opacity-100 transition-opacity shadow-lg">
+              {owner.name}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-800 dark:border-t-zinc-700" />
+            </div>
+          </div>
+        ) : (
+          <div className="w-6 h-6 rounded-full border-2 border-dashed border-foreground-muted/30 flex items-center justify-center" title="Sem responsável">
+            <span className="text-[9px] text-foreground-muted/50">?</span>
           </div>
         )}
 

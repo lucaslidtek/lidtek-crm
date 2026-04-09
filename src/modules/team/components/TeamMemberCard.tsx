@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Mail, Phone, Briefcase } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
-import { Badge } from '@/shared/components/ui/Badge';
+
 import type { User, UserRole } from '@/shared/types/models';
 
 interface TeamMemberCardProps {

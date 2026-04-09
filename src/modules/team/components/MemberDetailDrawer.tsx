@@ -14,7 +14,6 @@ import {
   Pencil,
   FolderKanban,
   ListTodo,
-  Users as UsersIcon,
 } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { Button } from '@/shared/components/ui/Button';

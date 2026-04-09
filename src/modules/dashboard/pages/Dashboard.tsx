@@ -6,9 +6,9 @@ import { Button } from '@/shared/components/ui/Button';
 import { PriorityBadge, TaskTypeBadge, Badge } from '@/shared/components/ui/Badge';
 import { FUNNEL_STAGES } from '@/shared/lib/constants';
 import {
-  UserPlus, ListPlus, ArrowRight, Calendar, AlertTriangle,
-  TrendingUp, FolderOpen, CheckCircle2, Clock, Zap,
-  Users, Briefcase, Target, ChevronRight,
+  UserPlus, ListPlus, Calendar, AlertTriangle,
+  TrendingUp, CheckCircle2, Clock, Zap,
+  Briefcase, Target, ChevronRight,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { LeadCreateDialog } from '@/modules/crm/components/LeadCreateDialog';
@@ -301,7 +301,7 @@ export function Dashboard() {
             {deliveringSoon.length > 0 ? (
               <div className="space-y-3">
                 {deliveringSoon.map(project => {
-                  const owner = getUserById(project.ownerId);
+                  const owner = project.ownerId ? getUserById(project.ownerId) : undefined;
                   const daysLeft = Math.ceil(
                     (new Date(project.nextDeliveryDate!).getTime() - Date.now()) / 86400000
                   );

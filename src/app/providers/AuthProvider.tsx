@@ -32,7 +32,7 @@ function authUserToProfile(authUser: { id: string; email?: string; user_metadata
   const fullName = meta['full_name'] ?? meta['name'] ?? authUser.email ?? 'Usuário';
   const parts = fullName.trim().split(' ');
   const initials = parts.length >= 2
-    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    ? ((parts[0]?.[0] ?? '') + (parts[parts.length - 1]?.[0] ?? '')).toUpperCase()
     : fullName.slice(0, 2).toUpperCase();
   return {
     id: authUser.id,
@@ -60,8 +60,9 @@ if (!localStorage.getItem(AUTH_MIGRATION_KEY)) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Initialize from localStorage for instant HMR recovery — prevents
-  // the flash-to-login that happens when Vite hot-reloads a module.
+  // Initialize user from localStorage for instant HMR UX — no flash-to-login.
+  // BUT isLoading ALWAYS starts true: the Store must wait for getSession()
+  // to complete before querying, so the Supabase JWT is in memory and ready.
   const [user, setUser] = useState<User | null>(() => {
     try {
       const cached = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -70,9 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
   });
-  const [isLoading, setIsLoading] = useState(() => !localStorage.getItem(AUTH_STORAGE_KEY));
-  // Guard so we only call setIsLoading(false) once — prevents race between
-  // getSession() and the INITIAL_SESSION event from onAuthStateChange.
+  // Always true on mount — resolved only after getSession() finishes.
+  // This guarantees the Supabase auth token is in memory before the Store
+  // fires any queries (prevents empty results from premature API calls).
+  const [isLoading, setIsLoading] = useState(true);
   const loadingResolved = useRef(false);
 
   const resolveLoading = useCallback(() => {
@@ -120,15 +122,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     // Safety net: if nothing resolves in 5s, force loading=false
-    // so the user sees the login page instead of an infinite spinner
     const safetyTimeout = setTimeout(() => {
       if (mounted) resolveLoading();
     }, 5000);
 
-    // ---- Step 1: getSession() ----
-    // In PKCE flow (production), this call exchanges the ?code= param from
-    // the URL for a real session token. MUST be called before relying on
-    // onAuthStateChange for the initial state.
+    // ── HMR fast-path ──
+    // On hot-reload, the component remounts with isLoading=true but the
+    // localStorage cache still has a valid user. Skip getSession() entirely
+    // to avoid lock contention and the ~200ms spinner on every code change.
+    const cachedUser = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (cachedUser) {
+      // User is cached — resolve immediately so the Store doesn't wait.
+      // onAuthStateChange below will still fire TOKEN_REFRESHED if needed.
+      resolveLoading();
+      // Still subscribe for future auth changes (logout, token refresh)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mounted) return;
+          if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+            await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+          } else if (event === 'SIGNED_OUT') {
+            setUser(null);
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+          }
+          resolveLoading();
+        }
+      );
+      return () => {
+        mounted = false;
+        clearTimeout(safetyTimeout);
+        subscription.unsubscribe();
+      };
+    }
+
+    // ── Cold start (first login or after logout) ──
+    // No cache — must call getSession() to exchange PKCE code or restore session.
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
       if (session?.user) {
