@@ -216,6 +216,7 @@ export const api = {
       const { data, error } = await supabase
         .from('profiles')
         .insert({
+          id: crypto.randomUUID(),
           name: input.name,
           email: input.email,
           role: input.role,

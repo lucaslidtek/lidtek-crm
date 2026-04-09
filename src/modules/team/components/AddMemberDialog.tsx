@@ -44,6 +44,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
   const [role, setRole] = useState<UserRole>('collaborator');
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function resetForm() {
     setName('');
@@ -52,6 +53,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
     setPosition('');
     setRole('collaborator');
     setErrors({});
+    setSubmitError(null);
   }
 
   function validate(): boolean {
@@ -71,6 +73,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
     if (!validate()) return;
 
     setSaving(true);
+    setSubmitError(null);
     try {
       await createUser({
         name: name.trim(),
@@ -79,10 +82,14 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
         position: position.trim() || undefined,
         role,
         initials: generateInitials(name),
+        avatarUrl: undefined,
         status: 'active',
       });
       resetForm();
       onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao adicionar membro';
+      setSubmitError(msg);
     } finally {
       setSaving(false);
     }
@@ -151,6 +158,12 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
               </SelectItem>
             ))}
           </Select>
+
+          {submitError && (
+            <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-xs text-red-700 dark:text-red-400">
+              {submitError}
+            </div>
+          )}
 
           <div className="pt-1 text-xs text-foreground-muted/70">
             <p>
