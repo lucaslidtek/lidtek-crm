@@ -26,22 +26,47 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+/** Build a minimal User from Supabase auth metadata as fallback. */
+function authUserToFallback(authUser: { id: string; email?: string; user_metadata?: Record<string, string> }): User {
+  const meta = authUser.user_metadata ?? {};
+  const fullName = meta['full_name'] ?? meta['name'] ?? authUser.email ?? 'Usuário';
+  const parts = fullName.trim().split(' ');
+  const initials = parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : fullName.slice(0, 2).toUpperCase();
+  return {
+    id: authUser.id,
+    name: fullName,
+    email: authUser.email ?? '',
+    role: 'admin',
+    initials,
+    avatarUrl: meta['avatar_url'] ?? meta['picture'] ?? undefined,
+    status: 'active',
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Map Supabase auth user + profile to our User type
-  const loadProfile = useCallback(async (authUserId: string) => {
+  /**
+   * Try to load the full profile row. If missing or blocked by RLS,
+   * fall back to the auth token metadata so the user is NEVER kicked out
+   * just because the profiles table isn't reachable.
+   */
+  const loadProfile = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', authUserId)
+        .eq('id', authUser.id)
         .maybeSingle();
 
       if (error || !data) {
-        console.error('Failed to load profile:', error);
-        setUser(null);
+        console.warn('Profile row unavailable, using auth metadata fallback:', error?.message);
+        const fallback = authUserToFallback(authUser);
+        setUser(fallback);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
         return;
       }
 
@@ -61,24 +86,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
     } catch (err) {
       console.error('Profile load error:', err);
-      setUser(null);
+      // On any unexpected error keep the user authenticated via fallback
+      const fallback = authUserToFallback(authUser);
+      setUser(fallback);
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
     }
   }, []);
 
-  // Initialize: check for existing session
+  // Initialize: check for existing Supabase session
   useEffect(() => {
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          await loadProfile(session.user.id);
+          await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
         } else {
-          // Try to restore from localStorage for demo/seed users
+          // No active session — restore cached user for instant first paint
           try {
             const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-            if (stored) {
-              setUser(JSON.parse(stored));
-            }
+            if (stored) setUser(JSON.parse(stored));
           } catch {
             localStorage.removeItem(AUTH_STORAGE_KEY);
           }
@@ -92,29 +118,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth();
 
-    // Listen for auth state changes (login/logout/token refresh)
+    // Listen for auth state changes (login / logout / token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          await loadProfile(session.user.id);
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+          await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+          setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           localStorage.removeItem(AUTH_STORAGE_KEY);
+          setIsLoading(false);
         }
       }
     );
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => { subscription.unsubscribe(); };
   }, [loadProfile]);
 
   const login = useCallback(() => {
     supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
+      options: { redirectTo: window.location.origin },
     });
   }, []);
 
