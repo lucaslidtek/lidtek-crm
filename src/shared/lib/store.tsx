@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { Lead, Project, Task, User, Sprint, FunnelStage, TaskStatus, ProjectType } from '@/shared/types/models';
 import { api } from '@/shared/lib/supabaseApi';
+import { supabase } from '@/shared/lib/supabase';
 
 // ============================================
 // STORE — Estado global do app
@@ -109,6 +110,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
+    // Wait for auth session to be ready before querying — prevents
+    // empty results when the JWT token hasn't been restored yet.
+    await supabase.auth.getSession();
     const [l, p, t, u] = await Promise.all([
       api.leads.list(),
       api.projects.list(),
@@ -124,6 +128,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refreshAll();
+
+    // Re-fetch data whenever auth state changes (login, token refresh, etc.)
+    // This guarantees data loads even if the initial refreshAll ran too early.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        refreshAll();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [refreshAll]);
 
   const createLead = useCallback(async (data: Parameters<typeof api.leads.create>[0]) => {

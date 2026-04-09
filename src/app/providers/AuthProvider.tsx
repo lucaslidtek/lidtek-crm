@@ -45,9 +45,32 @@ function authUserToProfile(authUser: { id: string; email?: string; user_metadata
   };
 }
 
+// One-time migration: clear session that may have been corrupted by dev auto-login hack.
+// This runs once, forces a clean re-login with Google, then never runs again.
+const AUTH_MIGRATION_KEY = 'lidtek-crm-auth-v2';
+if (!localStorage.getItem(AUTH_MIGRATION_KEY)) {
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+  // Clear Supabase's own session storage
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+      localStorage.removeItem(key);
+    }
+  }
+  localStorage.setItem(AUTH_MIGRATION_KEY, '1');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Initialize from localStorage for instant HMR recovery — prevents
+  // the flash-to-login that happens when Vite hot-reloads a module.
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = localStorage.getItem(AUTH_STORAGE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isLoading, setIsLoading] = useState(() => !localStorage.getItem(AUTH_STORAGE_KEY));
   // Guard so we only call setIsLoading(false) once — prevents race between
   // getSession() and the INITIAL_SESSION event from onAuthStateChange.
   const loadingResolved = useRef(false);
@@ -111,21 +134,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
       } else {
-        // ------- DEV AUTO-LOGIN HACK -------
-        if (import.meta.env.DEV && import.meta.env.VITE_DEV_PASSWORD) {
-          try {
-            const res = await supabase.auth.signInWithPassword({
-              email: 'lucas@lidtek.com.br',
-              password: import.meta.env.VITE_DEV_PASSWORD
-            });
-            // Se logar com sucesso, o evento onAuthStateChange vai automaticamente capturar e finalizar o Loading!
-            if (res.data?.session) return;
-          } catch (err) {
-            console.error('Silenced dev auto-login failure:', err);
-          }
-        }
-        // ------------------------------------
-
         setUser(null);
         localStorage.removeItem(AUTH_STORAGE_KEY);
       }
