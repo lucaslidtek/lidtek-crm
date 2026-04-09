@@ -26,8 +26,8 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-/** Build a minimal User from Supabase auth metadata as fallback. */
-function authUserToFallback(authUser: { id: string; email?: string; user_metadata?: Record<string, string> }): User {
+/** Build a User from Supabase auth token metadata (no DB query needed). */
+function authUserToProfile(authUser: { id: string; email?: string; user_metadata?: Record<string, string> }): User {
   const meta = authUser.user_metadata ?? {};
   const fullName = meta['full_name'] ?? meta['name'] ?? authUser.email ?? 'Usuário';
   const parts = fullName.trim().split(' ');
@@ -49,86 +49,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  /**
-   * Try to load the full profile row. If missing or blocked by RLS,
-   * fall back to the auth token metadata so the user is NEVER kicked out
-   * just because the profiles table isn't reachable.
-   */
   const loadProfile = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
+    // Always build from auth metadata first (instant, no network needed)
+    const fallback = authUserToProfile(authUser);
+    setUser(fallback);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
+
+    // Then try to enrich with full profile row (optional)
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
         .maybeSingle();
 
-      if (error || !data) {
-        console.warn('Profile row unavailable, using auth metadata fallback:', error?.message);
-        const fallback = authUserToFallback(authUser);
-        setUser(fallback);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
-        return;
+      if (data) {
+        const profile: User = {
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          initials: data.initials,
+          avatarUrl: data.avatar_url ?? undefined,
+          phone: data.phone ?? undefined,
+          position: data.position ?? undefined,
+          status: data.status ?? 'active',
+        };
+        setUser(profile);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
       }
-
-      const profile: User = {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        initials: data.initials,
-        avatarUrl: data.avatar_url ?? undefined,
-        phone: data.phone ?? undefined,
-        position: data.position ?? undefined,
-        status: data.status ?? 'active',
-      };
-
-      setUser(profile);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
-    } catch (err) {
-      console.error('Profile load error:', err);
-      // On any unexpected error keep the user authenticated via fallback
-      const fallback = authUserToFallback(authUser);
-      setUser(fallback);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
+    } catch {
+      // Silently ignore — fallback from auth metadata is already set
     }
   }, []);
 
-  // Initialize: check for existing Supabase session
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+    // Use ONLY onAuthStateChange — it fires INITIAL_SESSION on mount
+    // with the current session, so there is no need for a separate getSession() call.
+    // This eliminates the race condition between two concurrent auth paths.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
         if (session?.user) {
           await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
         } else {
-          // No active session — restore cached user for instant first paint
-          try {
-            const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-            if (stored) setUser(JSON.parse(stored));
-          } catch {
-            localStorage.removeItem(AUTH_STORAGE_KEY);
-          }
-        }
-      } catch (err) {
-        console.error('Auth init error:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-
-    // Listen for auth state changes (login / logout / token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
-          await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-          setIsLoading(false);
-        } else if (event === 'SIGNED_OUT') {
           setUser(null);
           localStorage.removeItem(AUTH_STORAGE_KEY);
-          setIsLoading(false);
         }
+        // Always mark loading done after the FIRST event (INITIAL_SESSION)
+        setIsLoading(false);
       }
     );
 
@@ -144,8 +112,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
   }, []);
 
   return (
