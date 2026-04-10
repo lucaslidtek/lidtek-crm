@@ -1,7 +1,7 @@
 import { useStore } from '@/shared/lib/store';
 import type { Lead } from '@/shared/types/models';
 import { Badge } from '@/shared/components/ui/Badge';
-import { FUNNEL_STAGES, BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageColor } from '@/shared/lib/constants';
+import { BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageColor } from '@/shared/lib/constants';
 import { Calendar, Building2, Phone, Repeat, Zap } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 
@@ -11,7 +11,7 @@ interface LeadListViewProps {
 }
 
 export function LeadListView({ leads, onLeadClick }: LeadListViewProps) {
-  const { getUserById } = useStore();
+  const { getUserById, funnelColumns } = useStore();
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
@@ -34,8 +34,8 @@ export function LeadListView({ leads, onLeadClick }: LeadListViewProps) {
           <tbody className="divide-y divide-border-subtle">
             {leads.map((lead) => {
               const owner = getUserById(lead.ownerId);
-              const stageColor = getStageColor(FUNNEL_STAGES, lead.stage);
-              const stageLabel = getStageLabel(FUNNEL_STAGES, lead.stage);
+              const stageColor = getStageColor(funnelColumns, lead.stage);
+              const stageLabel = getStageLabel(funnelColumns, lead.stage);
               const isOverdue = lead.nextContactDate && new Date(lead.nextContactDate) < new Date();
 
               const billingLabel = lead.billingType ? getStageLabel(BILLING_TYPES, lead.billingType) : null;

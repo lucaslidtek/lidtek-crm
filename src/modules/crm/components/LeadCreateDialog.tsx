@@ -7,7 +7,7 @@ import { useLeads } from '@/modules/crm/hooks/useLeads';
 import { useStore } from '@/shared/lib/store';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { LEAD_ORIGINS, BILLING_TYPES, BILLING_CYCLES } from '@/shared/lib/constants';
-import type { FunnelStage, BillingType, BillingCycle } from '@/shared/types/models';
+import type { BillingType, BillingCycle } from '@/shared/types/models';
 
 interface LeadCreateDialogProps {
   open: boolean;
@@ -16,7 +16,7 @@ interface LeadCreateDialogProps {
 
 export function LeadCreateDialog({ open, onOpenChange }: LeadCreateDialogProps) {
   const { createLead } = useLeads();
-  const { users } = useStore();
+  const { users, funnelColumns } = useStore();
   const { user: currentUser } = useAuth();
 
   const [name, setName] = useState('');
@@ -53,7 +53,9 @@ export function LeadCreateDialog({ open, onOpenChange }: LeadCreateDialogProps) 
         origin: origin || 'Outros',
         ownerId: effectiveOwnerId,
         notes: notes.trim(),
-        stage: 'prospecting' as FunnelStage,
+        stage: funnelColumns[0]?.id || 'prospecting',
+        emails: [],
+        phones: [],
         ...(billingType ? { billingType: billingType as BillingType } : {}),
         ...(billingType === 'recurring' && billingCycle ? { billingCycle: billingCycle as BillingCycle } : {}),
       });
@@ -80,7 +82,7 @@ export function LeadCreateDialog({ open, onOpenChange }: LeadCreateDialogProps) 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Novo Lead</DialogTitle>
-          <DialogDescription>O lead será criado na etapa "Prospecção".</DialogDescription>
+          <DialogDescription>O lead será criado na etapa "{funnelColumns[0]?.label || 'Prospecção'}".</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

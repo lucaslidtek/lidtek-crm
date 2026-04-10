@@ -16,15 +16,19 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { KanbanColumn } from './KanbanColumn';
+import { Plus } from 'lucide-react';
 import type { StageConfig } from '@/shared/lib/constants';
 
 interface KanbanBoardProps<T extends { id: string }> {
-  columns: StageConfig[];
+  columns: (StageConfig & { isDefault?: boolean })[];
   items: Record<string, T[]>;
   onMoveItem: (itemId: string, fromColumn: string, toColumn: string) => void;
   renderCard: (item: T) => ReactNode;
   onCardClick?: (item: T) => void;
   onChangeOrder?: (items: Record<string, T[]>) => void;
+  onAddColumn?: () => void;
+  onEditColumn?: (columnId: string) => void;
+  onDeleteColumn?: (columnId: string) => void;
 }
 
 // Custom collision detection: prioritize pointerWithin, fallback to rectIntersection
@@ -44,6 +48,9 @@ export function KanbanBoard<T extends { id: string }>({
   renderCard,
   onCardClick,
   onChangeOrder,
+  onAddColumn,
+  onEditColumn,
+  onDeleteColumn,
 }: KanbanBoardProps<T>) {
   const [activeItem, setActiveItem] = useState<T | null>(null);
   // Local copy of items for real-time reordering during drag
@@ -204,8 +211,24 @@ export function KanbanBoard<T extends { id: string }>({
             onCardClick={onCardClick}
             renderCard={renderCard}
             items={displayItems[column.id] ?? []}
+            onEdit={onEditColumn ? () => onEditColumn(column.id) : undefined}
+            onDelete={onDeleteColumn ? () => onDeleteColumn(column.id) : undefined}
+            isDefault={column.isDefault}
           />
         ))}
+
+        {/* Add Column Button */}
+        {onAddColumn && (
+          <button
+            onClick={onAddColumn}
+            className="flex-shrink-0 w-[300px] h-[120px] flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 hover:border-primary/40 hover:bg-primary/5 text-zinc-400 hover:text-primary transition-all duration-200 cursor-pointer group"
+          >
+            <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+              <Plus className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-medium">Nova Coluna</span>
+          </button>
+        )}
       </div>
 
       <DragOverlay dropAnimation={null}>

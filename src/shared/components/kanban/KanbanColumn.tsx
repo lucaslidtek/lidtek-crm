@@ -2,8 +2,8 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { cn } from '@/shared/utils/cn';
 import { KanbanCard } from './KanbanCard';
-import { ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 interface KanbanColumnProps<T extends { id: string }> {
@@ -14,6 +14,9 @@ interface KanbanColumnProps<T extends { id: string }> {
   items: T[];
   renderCard: (item: T) => ReactNode;
   onCardClick?: (item: T) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  isDefault?: boolean;
 }
 
 export function KanbanColumn<T extends { id: string }>({
@@ -24,9 +27,28 @@ export function KanbanColumn<T extends { id: string }>({
   items,
   renderCard,
   onCardClick,
+  onEdit,
+  onDelete,
+  isDefault,
 }: KanbanColumnProps<T>) {
   const { isOver, setNodeRef } = useDroppable({ id });
   const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
+  const hasMenu = onEdit || onDelete;
 
   // ── Collapsed state ──
   if (collapsed) {
@@ -82,9 +104,44 @@ export function KanbanColumn<T extends { id: string }>({
             {title}
           </h3>
         </div>
-        <span className="text-xs font-medium text-foreground-muted bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
-          {count}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-foreground-muted bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
+            {count}
+          </span>
+          {/* Column menu */}
+          {hasMenu && (
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer text-foreground-muted hover:text-foreground"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+              {menuOpen && (
+                <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl min-w-[160px] py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {onEdit && (
+                    <button
+                      onClick={() => { setMenuOpen(false); onEdit(); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                    >
+                      <Pencil className="w-3 h-3 text-zinc-400" />
+                      Editar coluna
+                    </button>
+                  )}
+                  {onDelete && !isDefault && (
+                    <button
+                      onClick={() => { setMenuOpen(false); onDelete(); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Excluir coluna
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Cards container */}

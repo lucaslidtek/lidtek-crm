@@ -1,4 +1,4 @@
-import type { Lead, Project, Sprint, Task, User, FunnelStage, TaskStatus } from '@/shared/types/models';
+import type { Lead, Project, Sprint, Task, User, FunnelStage, FunnelColumn, TaskStatus } from '@/shared/types/models';
 import { supabase } from '@/shared/lib/supabase';
 
 // ============================================
@@ -50,6 +50,13 @@ function rowToLead(row: any, taskIds: string[] = []): Lead {
     billingCycle: row.billing_cycle ?? undefined,
     solutionType: row.solution_type ?? undefined,
     lossReason: row.loss_reason ?? undefined,
+    cnpj: row.cnpj ?? undefined,
+    emails: row.emails ?? [],
+    phones: row.phones ?? [],
+    logoUrl: row.logo_url ?? undefined,
+    website: row.website ?? undefined,
+    razaoSocial: row.razao_social ?? undefined,
+    endereco: row.endereco ?? undefined,
     interactions: (row.interactions ?? []).map(rowToInteraction),
     taskIds,
     createdAt: row.created_at,
@@ -125,6 +132,13 @@ function buildLeadUpdate(updates: Partial<Lead>): Record<string, any> {
   if (updates.billingCycle !== undefined) payload.billing_cycle = updates.billingCycle;
   if (updates.solutionType !== undefined) payload.solution_type = updates.solutionType;
   if (updates.lossReason !== undefined) payload.loss_reason = updates.lossReason;
+  if (updates.cnpj !== undefined) payload.cnpj = updates.cnpj;
+  if (updates.emails !== undefined) payload.emails = updates.emails;
+  if (updates.phones !== undefined) payload.phones = updates.phones;
+  if (updates.logoUrl !== undefined) payload.logo_url = updates.logoUrl;
+  if (updates.website !== undefined) payload.website = updates.website;
+  if (updates.razaoSocial !== undefined) payload.razao_social = updates.razaoSocial;
+  if (updates.endereco !== undefined) payload.endereco = updates.endereco;
   payload.updated_at = new Date().toISOString();
   return payload;
 }
@@ -312,6 +326,13 @@ export const api = {
           billing_cycle: input.billingCycle,
           solution_type: input.solutionType,
           loss_reason: input.lossReason,
+          cnpj: input.cnpj,
+          emails: input.emails ?? [],
+          phones: input.phones ?? [],
+          logo_url: input.logoUrl,
+          website: input.website,
+          razao_social: input.razaoSocial,
+          endereco: input.endereco,
           created_at: now,
           updated_at: now,
         })
@@ -625,6 +646,100 @@ export const api = {
         .eq('id', id);
       if (error) throw new Error(`tasks.delete: ${error.message}`);
       return true;
+    },
+  },
+
+  // --- Funnel Columns ---
+  funnelColumns: {
+    list: async (): Promise<FunnelColumn[]> => {
+      const { data, error } = await supabase
+        .from('funnel_columns')
+        .select('*')
+        .order('position');
+      if (error) throw new Error(`funnelColumns.list: ${error.message}`);
+      return (data ?? []).map((row: any) => ({
+        id: row.id,
+        label: row.label,
+        color: row.color,
+        position: row.position,
+        isDefault: row.is_default ?? false,
+      }));
+    },
+
+    create: async (input: { label: string; color: string }): Promise<FunnelColumn> => {
+      // Get max position to append at end
+      const { data: maxRow } = await supabase
+        .from('funnel_columns')
+        .select('position')
+        .order('position', { ascending: false })
+        .limit(1)
+        .single();
+      const nextPosition = (maxRow?.position ?? -1) + 1;
+
+      const { data, error } = await supabase
+        .from('funnel_columns')
+        .insert({
+          label: input.label,
+          color: input.color,
+          position: nextPosition,
+          is_default: false,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(`funnelColumns.create: ${error.message}`);
+      return {
+        id: data.id,
+        label: data.label,
+        color: data.color,
+        position: data.position,
+        isDefault: false,
+      };
+    },
+
+    update: async (id: string, updates: Partial<Pick<FunnelColumn, 'label' | 'color'>>): Promise<FunnelColumn> => {
+      const payload: Record<string, any> = {};
+      if (updates.label !== undefined) payload.label = updates.label;
+      if (updates.color !== undefined) payload.color = updates.color;
+
+      const { data, error } = await supabase
+        .from('funnel_columns')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw new Error(`funnelColumns.update: ${error.message}`);
+      return {
+        id: data.id,
+        label: data.label,
+        color: data.color,
+        position: data.position,
+        isDefault: data.is_default ?? false,
+      };
+    },
+
+    delete: async (id: string, fallbackColumnId: string): Promise<void> => {
+      // Move all leads in this column to the fallback column
+      await supabase
+        .from('leads')
+        .update({ stage: fallbackColumnId, updated_at: new Date().toISOString() })
+        .eq('stage', id);
+
+      const { error } = await supabase
+        .from('funnel_columns')
+        .delete()
+        .eq('id', id);
+      if (error) throw new Error(`funnelColumns.delete: ${error.message}`);
+    },
+
+    reorder: async (columns: { id: string; position: number }[]): Promise<void> => {
+      // Batch update positions
+      const promises = columns.map((col) =>
+        supabase
+          .from('funnel_columns')
+          .update({ position: col.position })
+          .eq('id', col.id)
+      );
+      await Promise.all(promises);
     },
   },
 

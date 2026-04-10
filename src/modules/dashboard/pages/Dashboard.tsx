@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { cn } from '@/shared/utils/cn';
 import { Button } from '@/shared/components/ui/Button';
 import { PriorityBadge, TaskTypeBadge, Badge } from '@/shared/components/ui/Badge';
-import { FUNNEL_STAGES } from '@/shared/lib/constants';
+
 import {
   UserPlus, ListPlus, Calendar, AlertTriangle,
   TrendingUp, CheckCircle2, Clock, Zap,
@@ -15,7 +15,7 @@ import { LeadCreateDialog } from '@/modules/crm/components/LeadCreateDialog';
 import { TaskCreateDialog } from '@/modules/tasks/components/TaskCreateDialog';
 
 export function Dashboard() {
-  const { leads, projects, tasks, getUserById } = useStore();
+  const { leads, projects, tasks, getUserById, funnelColumns } = useStore();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
@@ -68,13 +68,13 @@ export function Dashboard() {
 
   // ─── Pipeline funnel visualization ───
   const funnelData = useMemo(() =>
-    FUNNEL_STAGES
+    funnelColumns
       .filter(s => s.id !== 'lost')
       .map(stage => ({
         ...stage,
         count: leads.filter(l => l.stage === stage.id).length,
       })),
-    [leads]
+    [leads, funnelColumns]
   );
   const maxFunnelCount = Math.max(...funnelData.map(s => s.count), 1);
 

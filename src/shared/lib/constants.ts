@@ -1,4 +1,4 @@
-import type { FunnelStage, ProjectStage, TaskStatus, TaskPriority, TaskType, ProjectType, BillingType, BillingCycle } from '@/shared/types/models';
+import type { ProjectStage, TaskStatus, TaskPriority, TaskType, ProjectType, BillingType, BillingCycle, FunnelColumn } from '@/shared/types/models';
 
 // ============================================
 // CONSTANTS — Labels, cores e configurações
@@ -10,8 +10,8 @@ export interface StageConfig {
   color: string;
 }
 
-// --- Funil de Vendas (M1) ---
-export const FUNNEL_STAGES: (StageConfig & { id: FunnelStage })[] = [
+// --- Funil de Vendas — Defaults (fallback quando tabela está vazia) ---
+export const FUNNEL_STAGES: StageConfig[] = [
   { id: 'prospecting', label: 'Prospecção', color: '#A3A3A3' },
   { id: 'first_meeting', label: '1ª Reunião', color: '#6580E1' },
   { id: 'briefing', label: 'Briefing', color: '#5A4FFF' },
@@ -21,6 +21,12 @@ export const FUNNEL_STAGES: (StageConfig & { id: FunnelStage })[] = [
   { id: 'contract_signed', label: 'Contrato Assinado', color: '#059669' },
   { id: 'lost', label: 'Perdido', color: '#EF4444' },
 ];
+
+export const DEFAULT_FUNNEL_COLUMNS: FunnelColumn[] = FUNNEL_STAGES.map((s, i) => ({
+  ...s,
+  position: i,
+  isDefault: true,
+}));
 
 // --- Etapas de Projeto (M2) ---
 export const PROJECT_STAGES: (StageConfig & { id: ProjectStage })[] = [

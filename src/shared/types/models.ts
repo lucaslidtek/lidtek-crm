@@ -5,15 +5,15 @@
 
 // --- Enums / Union Types ---
 
-export type FunnelStage =
-  | 'prospecting'
-  | 'first_meeting'
-  | 'briefing'
-  | 'proposal_sent'
-  | 'negotiation'
-  | 'contract_sent'
-  | 'contract_signed'
-  | 'lost';
+export type FunnelStage = string;
+
+export interface FunnelColumn {
+  id: string;
+  label: string;
+  color: string;
+  position: number;
+  isDefault: boolean;
+}
 
 export type ProjectType = 'recurring' | 'oneshot';
 
@@ -78,6 +78,13 @@ export interface Lead {
   billingCycle?: BillingCycle;
   solutionType?: string;
   lossReason?: string;
+  cnpj?: string;
+  emails: string[];
+  phones: string[];
+  logoUrl?: string;
+  website?: string;
+  razaoSocial?: string;
+  endereco?: string;
   interactions: Interaction[];
   taskIds: string[];
   createdAt: string;

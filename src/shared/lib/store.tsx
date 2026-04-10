@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import type { Lead, Project, Task, User, Sprint, FunnelStage, TaskStatus, ProjectType } from '@/shared/types/models';
+import type { Lead, Project, Task, User, Sprint, FunnelStage, FunnelColumn, TaskStatus, ProjectType } from '@/shared/types/models';
 import { api } from '@/shared/lib/supabaseApi';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { DEFAULT_FUNNEL_COLUMNS } from '@/shared/lib/constants';
 
 // ============================================
 // STORE — Estado global do app
@@ -14,6 +15,7 @@ interface StoreState {
   projects: Project[];
   tasks: Task[];
   users: User[];
+  funnelColumns: FunnelColumn[];
   loading: boolean;
 }
 
@@ -42,6 +44,12 @@ interface StoreActions {
   createUser: (data: Parameters<typeof api.users.create>[0]) => Promise<User>;
   updateUser: (id: string, data: Partial<User>) => Promise<User>;
   deleteUser: (id: string) => Promise<void>;
+  // Funnel Columns
+  refreshFunnelColumns: () => Promise<void>;
+  createFunnelColumn: (data: { label: string; color: string }) => Promise<FunnelColumn>;
+  updateFunnelColumn: (id: string, data: Partial<Pick<FunnelColumn, 'label' | 'color'>>) => Promise<FunnelColumn>;
+  deleteFunnelColumn: (id: string) => Promise<void>;
+  reorderFunnelColumns: (columns: FunnelColumn[]) => Promise<void>;
   // Utils
   refreshAll: () => Promise<void>;
   getUserById: (id: string) => User | undefined;
@@ -67,6 +75,7 @@ let _cache: {
   projects: Project[];
   tasks: Task[];
   users: User[];
+  funnelColumns: FunnelColumn[];
 } | null = null;
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -84,6 +93,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>(() => _cache?.projects ?? []);
   const [tasks, setTasks] = useState<Task[]>(() => _cache?.tasks ?? []);
   const [users, setUsers] = useState<User[]>(() => _cache?.users ?? []);
+  const [funnelColumns, setFunnelColumns] = useState<FunnelColumn[]>(() => _cache?.funnelColumns ?? DEFAULT_FUNNEL_COLUMNS);
   // Start loading=false if we have cached data (HMR) — true only on cold start
   const [loading, setLoading] = useState(() => _cache === null);
   const fetchedRef = useRef(false);
@@ -139,14 +149,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshFunnelColumns = useCallback(async () => {
+    try {
+      const cols = await api.funnelColumns.list();
+      setFunnelColumns(cols.length > 0 ? cols : DEFAULT_FUNNEL_COLUMNS);
+    } catch (err) {
+      console.warn('[Store] refreshFunnelColumns failed:', err);
+    }
+  }, []);
+
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [u, l, p, t] = await Promise.all([
+      const [u, l, p, t, fc] = await Promise.all([
         api.users.list(),
         api.leads.list(),
         api.projects.list(),
         api.tasks.list(),
+        api.funnelColumns.list(),
       ]);
 
       // If users returned empty, the profile may still be being created (upsert race).
@@ -161,12 +181,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }, 2000);
       });
 
+      // ── Backfill: create tasks for orphan sprints ──
+      // Any sprint that has no linked task gets one auto-created.
+      const taskSprintIds = new Set(t.filter(tk => tk.sprintId).map(tk => tk.sprintId));
+      const orphanSprints: { sprint: { id: string; name: string; endDate?: string }; project: typeof p[number] }[] = [];
+      for (const proj of p) {
+        for (const sp of proj.sprints) {
+          if (!taskSprintIds.has(sp.id)) {
+            orphanSprints.push({ sprint: sp, project: proj });
+          }
+        }
+      }
+
+      let finalTasks = t;
+      if (orphanSprints.length > 0) {
+        console.log(`[Store] Backfilling ${orphanSprints.length} orphan sprint(s) with tasks...`);
+        await Promise.all(orphanSprints.map(({ sprint, project }) =>
+          api.tasks.create({
+            title: sprint.name,
+            type: 'project',
+            status: 'todo',
+            priority: 'medium',
+            ownerId: project.ownerId || resolvedUsers[0]?.id || '',
+            tags: [],
+            projectId: project.id,
+            sprintId: sprint.id,
+            dueDate: sprint.endDate,
+          })
+        ));
+        // Re-fetch tasks to include the newly created ones
+        finalTasks = await api.tasks.list();
+      }
+
+      const resolvedColumns = fc.length > 0 ? fc : DEFAULT_FUNNEL_COLUMNS;
       setUsers(resolvedUsers);
       setLeads(l);
       setProjects(p);
-      setTasks(t);
+      setTasks(finalTasks);
+      setFunnelColumns(resolvedColumns);
       // Populate module-level cache so HMR remounts restore data instantly
-      _cache = { leads: l, projects: p, tasks: t, users: resolvedUsers };
+      _cache = { leads: l, projects: p, tasks: finalTasks, users: resolvedUsers, funnelColumns: resolvedColumns };
     } catch (err) {
       // DON'T wipe state on error — preserve whatever is in state already.
       // The user sees stale data rather than an empty screen.
@@ -213,9 +267,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProjects([]);
       setTasks([]);
       setUsers([]);
+      setFunnelColumns(DEFAULT_FUNNEL_COLUMNS);
       setLoading(false);
     }
   }, [isAuthenticated, authLoading, refreshAll]);
+
+  const createFunnelColumn = useCallback(async (data: { label: string; color: string }) => {
+    const col = await api.funnelColumns.create(data);
+    await refreshFunnelColumns();
+    return col;
+  }, [refreshFunnelColumns]);
+
+  const updateFunnelColumn = useCallback(async (id: string, data: Partial<Pick<FunnelColumn, 'label' | 'color'>>) => {
+    const col = await api.funnelColumns.update(id, data);
+    await refreshFunnelColumns();
+    return col;
+  }, [refreshFunnelColumns]);
+
+  const deleteFunnelColumn = useCallback(async (id: string) => {
+    const firstColumn = funnelColumns[0];
+    const fallbackId = firstColumn && firstColumn.id !== id ? firstColumn.id : (funnelColumns.find(c => c.id !== id)?.id ?? 'prospecting');
+    await api.funnelColumns.delete(id, fallbackId);
+    await Promise.all([refreshFunnelColumns(), refreshLeads()]);
+  }, [funnelColumns, refreshFunnelColumns, refreshLeads]);
+
+  const reorderFunnelColumns = useCallback(async (reordered: FunnelColumn[]) => {
+    // Optimistic update
+    setFunnelColumns(reordered);
+    const positions = reordered.map((col, i) => ({ id: col.id, position: i }));
+    await api.funnelColumns.reorder(positions);
+  }, []);
 
   const createLead = useCallback(async (data: Parameters<typeof api.leads.create>[0]) => {
     const lead = await api.leads.create(data);
@@ -259,9 +340,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshTasks]);
 
   const createSprint = useCallback(async (projectId: string, data: Parameters<typeof api.sprints.create>[1]) => {
-    await api.sprints.create(projectId, data);
-    await refreshProjects();
-  }, [refreshProjects]);
+    const sprint = await api.sprints.create(projectId, data);
+
+    // Auto-create a task linked to this sprint so it appears on the Tasks board
+    const project = projects.find(p => p.id === projectId);
+    await api.tasks.create({
+      title: data.name,
+      type: 'project',
+      status: 'todo',
+      priority: 'medium',
+      ownerId: project?.ownerId || users[0]?.id || '',
+      tags: [],
+      projectId,
+      sprintId: sprint.id,
+      dueDate: data.endDate,
+    });
+
+    await Promise.all([refreshProjects(), refreshTasks()]);
+  }, [refreshProjects, refreshTasks, projects, users]);
 
   const updateSprint = useCallback(async (sprintId: string, data: Partial<Sprint>) => {
     await api.sprints.update(sprintId, data);
@@ -326,19 +422,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       leadId: lead.id,
     });
 
-    // 4. Create initial onboarding sprint
-    await api.sprints.create(project.id, {
+    // 4. Create initial onboarding sprint + linked task
+    const sprint = await api.sprints.create(project.id, {
       name: 'Onboarding — Setup inicial',
       stage: 'onboarding',
       startDate: new Date().toISOString(),
       status: 'active',
     });
 
+    await api.tasks.create({
+      title: 'Onboarding — Setup inicial',
+      type: 'project',
+      status: 'todo',
+      priority: 'medium',
+      ownerId: lead.ownerId || users[0]?.id || '',
+      tags: [],
+      projectId: project.id,
+      sprintId: sprint.id,
+    });
+
     // 5. Refresh everything
     await refreshAll();
 
     return project;
-  }, [leads, refreshAll]);
+  }, [leads, users, refreshAll]);
 
   const reorderLeads = useCallback((reorderedSubset: Lead[]) => {
     setLeads(current => {
@@ -366,7 +473,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      leads, projects, tasks, users, loading,
+      leads, projects, tasks, users, funnelColumns, loading,
       refreshLeads, refreshProjects, refreshTasks, refreshAll,
       createLead, updateLead, moveLeadStage, deleteLead,
       updateProject,
@@ -376,6 +483,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       completeSprint,
       deleteSprint,
       refreshUsers, createUser, updateUser, deleteUser,
+      refreshFunnelColumns, createFunnelColumn, updateFunnelColumn, deleteFunnelColumn, reorderFunnelColumns,
       getUserById,
       convertLeadToProject,
       reorderLeads,
