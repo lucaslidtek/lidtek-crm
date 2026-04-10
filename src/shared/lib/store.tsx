@@ -98,6 +98,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(() => _cache === null);
   const fetchedRef = useRef(false);
 
+  // ── Enrich projects with lead data ──
+  // Client fields (name, contact, phone) come from the lead relationship,
+  // ensuring a single source of truth. When a lead is renamed, all project
+  // and task references update automatically.
+  const enrichProjectsWithLeads = useCallback((rawProjects: Project[], allLeads: Lead[]): Project[] => {
+    const leadMap = new Map(allLeads.map(l => [l.id, l]));
+    return rawProjects.map(p => {
+      const lead = leadMap.get(p.leadId);
+      if (lead) {
+        return {
+          ...p,
+          clientName: lead.name,
+          clientContact: lead.contact,
+          clientPhone: lead.phone,
+        };
+      }
+      return p;
+    });
+  }, []);
+
   const refreshLeads = useCallback(async () => {
     try {
       const fresh = await api.leads.list();
@@ -110,18 +130,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return orderA - orderB;
         });
       });
+      // Re-enrich projects with updated lead data
+      setProjects(current => enrichProjectsWithLeads(current, fresh));
     } catch (err) {
-      console.warn('[Store] refreshLeads failed — preserving existing state:', err);
+      console.warn('[Store] refreshLeads failed - preserving existing state:', err);
     }
-  }, []);
+  }, [enrichProjectsWithLeads]);
 
   const refreshProjects = useCallback(async () => {
     try {
       const fresh = await api.projects.list();
+      // Get current leads to enrich
+      const currentLeads = await api.leads.list();
+      const enriched = enrichProjectsWithLeads(fresh, currentLeads);
       setProjects(current => {
-        if (current.length === 0) return fresh;
+        if (current.length === 0) return enriched;
         const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
-        return fresh.sort((a, b) => {
+        return enriched.sort((a, b) => {
           const orderA = orderMap.get(a.id) ?? 99999;
           const orderB = orderMap.get(b.id) ?? 99999;
           return orderA - orderB;
@@ -130,7 +155,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.warn('[Store] refreshProjects failed — preserving existing state:', err);
     }
-  }, []);
+  }, [enrichProjectsWithLeads]);
 
   const refreshTasks = useCallback(async () => {
     try {
@@ -214,13 +239,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
 
       const resolvedColumns = fc.length > 0 ? fc : DEFAULT_FUNNEL_COLUMNS;
+      // Enrich projects with lead data (single source of truth)
+      const enrichedProjects = enrichProjectsWithLeads(p, l);
       setUsers(resolvedUsers);
       setLeads(l);
-      setProjects(p);
+      setProjects(enrichedProjects);
       setTasks(finalTasks);
       setFunnelColumns(resolvedColumns);
       // Populate module-level cache so HMR remounts restore data instantly
-      _cache = { leads: l, projects: p, tasks: finalTasks, users: resolvedUsers, funnelColumns: resolvedColumns };
+      _cache = { leads: l, projects: enrichedProjects, tasks: finalTasks, users: resolvedUsers, funnelColumns: resolvedColumns };
     } catch (err) {
       // DON'T wipe state on error — preserve whatever is in state already.
       // The user sees stale data rather than an empty screen.
@@ -306,6 +333,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateLead = useCallback(async (id: string, data: Partial<Lead>) => {
     const lead = await api.leads.update(id, data);
+    // refreshLeads also re-enriches projects with lead data,
+    // so name/contact/phone changes propagate automatically.
     await refreshLeads();
     return lead;
   }, [refreshLeads]);
@@ -415,8 +444,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     // 3. Create a new project from the lead data
     const project = await api.projects.create({
-      clientName: lead.name,
-      clientContact: lead.contact,
+      clientName: lead.name,       // Stored for DB queries; UI overrides from lead
+      clientContact: lead.contact,  // Stored for DB queries; UI overrides from lead
       type: projectType,
       status: 'active',
       leadId: lead.id,

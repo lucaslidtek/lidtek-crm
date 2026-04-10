@@ -18,7 +18,7 @@ interface ProjectDetailDrawerProps {
 }
 
 export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerProps) {
-  const { getUserById, leads, updateProject, updateSprint, completeSprint, deleteSprint, users } = useStore();
+  const { getUserById, leads, updateProject, updateLead, updateSprint, completeSprint, deleteSprint, users } = useStore();
   const { canEdit } = usePermissions();
   const [, setLocation] = useLocation();
 
@@ -27,19 +27,24 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
   // Can this user edit this specific project?
   const editable = canEdit(project.ownerId);
 
-  const handleFieldSave = async (field: keyof Project, value: string) => {
-    if (!project || project[field] === value) return;
+  const linkedLead = leads.find(l => l.id === project.leadId);
+
+  const handleFieldSave = async (field: keyof Project | 'clientName' | 'clientContact' | 'clientPhone', value: string) => {
+    if (!project) return;
+    // Client fields are owned by the lead — edit there for single source of truth
+    if ((field === 'clientName' || field === 'clientContact' || field === 'clientPhone') && linkedLead) {
+      const leadField = field === 'clientName' ? 'name' : field === 'clientContact' ? 'contact' : 'phone';
+      if ((linkedLead as any)[leadField] === value) return;
+      await updateLead(linkedLead.id, { [leadField]: value });
+      return;
+    }
+    if (project[field as keyof Project] === value) return;
     const updates: Partial<Project> = {};
-    if (field === 'clientName') updates.clientName = value;
-    if (field === 'clientContact') updates.clientContact = value;
-    if (field === 'clientPhone') updates.clientPhone = value;
     if (field === 'ownerId') updates.ownerId = value;
     await updateProject(project.id, updates);
   };
 
-
   const currentSprint = project.sprints.find(s => s.id === project.currentSprintId);
-  const linkedLead = leads.find(l => l.id === project.leadId);
   const stageColor = currentSprint ? getStageColor(PROJECT_STAGES, currentSprint.stage) : '#A3A3A3';
   const stageLabel = currentSprint ? getStageLabel(PROJECT_STAGES, currentSprint.stage) : 'Onboarding';
 

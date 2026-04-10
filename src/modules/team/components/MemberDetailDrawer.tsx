@@ -15,6 +15,7 @@ import {
   Pencil,
   FolderKanban,
   ListTodo,
+  User as UserIcon,
 } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { Button } from '@/shared/components/ui/Button';
@@ -158,6 +159,28 @@ function RoleSelector({ value, onSave }: { value: UserRole; onSave: (role: UserR
 export function MemberDetailDrawer({ member, open, onOpenChange }: MemberDetailDrawerProps) {
   const { updateUser, deleteUser, projects, tasks } = useStore();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (member) setNameDraft(member.name);
+  }, [member]);
+
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.focus();
+  }, [editingName]);
+
+  function commitName() {
+    setEditingName(false);
+    if (member && nameDraft.trim() && nameDraft.trim() !== member.name) {
+      const parts = nameDraft.trim().split(/\s+/);
+      const initials = (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '');
+      updateUser(member.id, { name: nameDraft.trim(), initials: initials.toUpperCase() });
+    } else if (member) {
+      setNameDraft(member.name);
+    }
+  }
 
   const close = useCallback(() => {
     setConfirmDelete(false);
@@ -260,10 +283,48 @@ export function MemberDetailDrawer({ member, open, onOpenChange }: MemberDetailD
                       </span>
                     </div>
                   )}
-                  <div className="min-w-0">
-                    <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight truncate">
-                      {member.name}
-                    </h2>
+                  <div className="min-w-0 flex-1">
+                    {editingName ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={nameInputRef}
+                          type="text"
+                          value={nameDraft}
+                          onChange={(e) => setNameDraft(e.target.value)}
+                          className={cn(
+                            'flex-1 min-w-0 px-3 py-1.5 rounded-lg text-lg font-bold',
+                            'bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700',
+                            'text-zinc-900 dark:text-zinc-100 placeholder:text-foreground-muted/50',
+                            'focus:outline-none focus:ring-2 focus:ring-primary/30',
+                            'transition-all duration-200'
+                          )}
+                          placeholder="Nome do membro"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitName();
+                            if (e.key === 'Escape') { setNameDraft(member.name); setEditingName(false); }
+                          }}
+                          onBlur={commitName}
+                        />
+                        <button
+                          onClick={commitName}
+                          className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center hover:bg-primary/25 transition-colors cursor-pointer flex-shrink-0"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group">
+                        <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight truncate">
+                          {member.name}
+                        </h2>
+                        <button
+                          onClick={() => setEditingName(true)}
+                          className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer flex-shrink-0"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                     {member.position && (
                       <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">{member.position}</p>
                     )}

@@ -5,7 +5,6 @@ import { cn } from '@/shared/utils/cn';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { useStore } from '@/shared/lib/store';
-import { usePermissions } from '@/shared/hooks/usePermissions';
 import { LEAD_ORIGINS, BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageColor } from '@/shared/lib/constants';
 import type { Lead, Interaction, ProjectType, BillingType, BillingCycle, FunnelStage } from '@/shared/types/models';
 import { useState, useRef, useEffect } from 'react';
@@ -33,7 +32,6 @@ const interactionLabels: Record<Interaction['type'], string> = {
 
 export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
   const { getUserById, updateLead, deleteLead, convertLeadToProject, projects, users, funnelColumns, moveLeadStage } = useStore();
-  const { canEdit, canEditAll } = usePermissions();
   const [, setLocation] = useLocation();
   const [converting, setConverting] = useState<boolean>(false);
   const [selectedType, setSelectedType] = useState<ProjectType>('oneshot');
