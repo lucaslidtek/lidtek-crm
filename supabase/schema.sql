@@ -1,146 +1,135 @@
--- ============================================
--- SCHEMA — Lidtek CRM & Gestão de Projetos
--- Supabase PostgreSQL
--- ============================================
+-- =============================================
+-- LIDTEK CRM - Complete Schema
+-- Execute in Supabase SQL Editor for project: symera (kwybsuniuehqddpjqpwl)
+-- =============================================
 
--- 1. profiles (vinculado a auth.users)
-create table if not exists profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  name text not null,
-  email text not null,
-  role text not null default 'collaborator',
-  initials text not null default '',
-  avatar_url text,
-  phone text,
-  position text,
-  status text not null default 'active',
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+-- 1. Ensure profiles table has all required columns
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS position TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+-- 2. LEADS TABLE
+CREATE TABLE IF NOT EXISTS public.leads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  contact TEXT NOT NULL,
+  phone TEXT,
+  origin TEXT NOT NULL DEFAULT 'Outros',
+  owner_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  notes TEXT DEFAULT '',
+  stage TEXT NOT NULL DEFAULT 'prospecting',
+  next_contact_date TIMESTAMPTZ,
+  estimated_value NUMERIC(12,2),
+  billing_type TEXT,
+  billing_cycle TEXT,
+  solution_type TEXT,
+  loss_reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. leads
-create table if not exists leads (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  contact text not null,
-  phone text,
-  origin text not null,
-  owner_id uuid references profiles(id) on delete set null,
-  notes text default '',
-  stage text not null default 'prospecting',
-  next_contact_date timestamptz,
-  estimated_value numeric,
-  billing_type text,
-  billing_cycle text,
-  solution_type text,
-  loss_reason text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+-- 3. INTERACTIONS TABLE
+CREATE TABLE IF NOT EXISTS public.interactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lead_id UUID NOT NULL REFERENCES public.leads(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  content TEXT NOT NULL,
+  date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. interactions (extraído do array embeddado em Lead)
-create table if not exists interactions (
-  id uuid primary key default gen_random_uuid(),
-  lead_id uuid not null references leads(id) on delete cascade,
-  type text not null,
-  content text not null,
-  date timestamptz not null,
-  user_id uuid references profiles(id) on delete set null,
-  created_at timestamptz default now()
+-- 4. PROJECTS TABLE
+CREATE TABLE IF NOT EXISTS public.projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_name TEXT NOT NULL,
+  client_contact TEXT,
+  client_phone TEXT,
+  type TEXT NOT NULL DEFAULT 'website',
+  status TEXT NOT NULL DEFAULT 'active',
+  owner_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  current_sprint_id UUID,
+  next_delivery_date TIMESTAMPTZ,
+  lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. projects
-create table if not exists projects (
-  id uuid primary key default gen_random_uuid(),
-  client_name text not null,
-  client_contact text not null,
-  client_phone text,
-  type text not null,
-  status text not null default 'active',
-  owner_id uuid references profiles(id) on delete set null,
-  current_sprint_id uuid,
-  next_delivery_date timestamptz,
-  lead_id uuid references leads(id) on delete set null,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+-- 5. SPRINTS TABLE
+CREATE TABLE IF NOT EXISTS public.sprints (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  stage TEXT NOT NULL DEFAULT 'onboarding',
+  start_date TIMESTAMPTZ,
+  end_date TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. sprints (extraído do array embeddado em Project)
-create table if not exists sprints (
-  id uuid primary key default gen_random_uuid(),
-  project_id uuid not null references projects(id) on delete cascade,
-  name text not null,
-  stage text not null,
-  start_date timestamptz not null,
-  end_date timestamptz,
-  status text not null default 'active',
-  created_at timestamptz default now()
+-- 6. CRM TASKS TABLE (named crm_tasks to avoid conflict with existing tasks table)
+CREATE TABLE IF NOT EXISTS public.crm_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  type TEXT NOT NULL DEFAULT 'standalone',
+  status TEXT NOT NULL DEFAULT 'todo',
+  priority TEXT NOT NULL DEFAULT 'medium',
+  owner_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  due_date TIMESTAMPTZ,
+  tags TEXT[] DEFAULT '{}',
+  project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
+  sprint_id UUID REFERENCES public.sprints(id) ON DELETE SET NULL,
+  lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- FK circular: projects.current_sprint_id → sprints.id
-alter table projects
-  add constraint fk_current_sprint
-  foreign key (current_sprint_id) references sprints(id) on delete set null;
+-- 7. Enable RLS on all CRM tables
+ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.interactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sprints ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.crm_tasks ENABLE ROW LEVEL SECURITY;
 
--- 6. tasks
-create table if not exists tasks (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  description text,
-  type text not null,
-  status text not null default 'todo',
-  priority text not null default 'medium',
-  owner_id uuid references profiles(id) on delete set null,
-  due_date timestamptz,
-  tags text[] default '{}',
-  project_id uuid references projects(id) on delete set null,
-  sprint_id uuid references sprints(id) on delete set null,
-  lead_id uuid references leads(id) on delete set null,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+-- 8. RLS Policies: Authenticated users can do everything
+-- LEADS
+DROP POLICY IF EXISTS "leads_select" ON public.leads;
+CREATE POLICY "leads_select" ON public.leads FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "leads_insert" ON public.leads;
+CREATE POLICY "leads_insert" ON public.leads FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "leads_update" ON public.leads;
+CREATE POLICY "leads_update" ON public.leads FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "leads_delete" ON public.leads;
+CREATE POLICY "leads_delete" ON public.leads FOR DELETE TO authenticated USING (true);
 
--- ============================================
--- TRIGGER: Auto-create profile on first login
--- ============================================
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, name, email, initials, avatar_url)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'Usuário'),
-    coalesce(new.email, ''),
-    upper(
-      coalesce(
-        left(new.raw_user_meta_data->>'full_name', 1) ||
-        coalesce(left(split_part(new.raw_user_meta_data->>'full_name', ' ', 2), 1), ''),
-        left(coalesce(new.email, 'U'), 2)
-      )
-    ),
-    new.raw_user_meta_data->>'avatar_url'
-  );
-  return new;
-end;
-$$ language plpgsql security definer;
+-- INTERACTIONS
+DROP POLICY IF EXISTS "interactions_all" ON public.interactions;
+CREATE POLICY "interactions_all" ON public.interactions FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
--- Drop existing trigger if any, then create
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
+-- PROJECTS
+DROP POLICY IF EXISTS "projects_select" ON public.projects;
+CREATE POLICY "projects_select" ON public.projects FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "projects_insert" ON public.projects;
+CREATE POLICY "projects_insert" ON public.projects FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "projects_update" ON public.projects;
+CREATE POLICY "projects_update" ON public.projects FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "projects_delete" ON public.projects;
+CREATE POLICY "projects_delete" ON public.projects FOR DELETE TO authenticated USING (true);
 
--- ============================================
--- INDEXES for common queries
--- ============================================
-create index if not exists idx_leads_stage on leads(stage);
-create index if not exists idx_leads_owner on leads(owner_id);
-create index if not exists idx_interactions_lead on interactions(lead_id);
-create index if not exists idx_projects_status on projects(status);
-create index if not exists idx_projects_owner on projects(owner_id);
-create index if not exists idx_sprints_project on sprints(project_id);
-create index if not exists idx_tasks_status on tasks(status);
-create index if not exists idx_tasks_owner on tasks(owner_id);
-create index if not exists idx_tasks_project on tasks(project_id);
-create index if not exists idx_tasks_sprint on tasks(sprint_id);
-create index if not exists idx_tasks_lead on tasks(lead_id);
+-- SPRINTS
+DROP POLICY IF EXISTS "sprints_all" ON public.sprints;
+CREATE POLICY "sprints_all" ON public.sprints FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- CRM_TASKS
+DROP POLICY IF EXISTS "crm_tasks_all" ON public.crm_tasks;
+CREATE POLICY "crm_tasks_all" ON public.crm_tasks FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 9. Verify - show all tables
+SELECT table_name, 
+  (SELECT COUNT(*) FROM information_schema.columns c WHERE c.table_name = t.table_name AND c.table_schema = 'public') as columns
+FROM information_schema.tables t
+WHERE table_schema = 'public'
+ORDER BY table_name;

@@ -4,9 +4,15 @@ import { useLocation } from 'wouter';
 import { useEffect, useState } from 'react';
 
 export function Login() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, loginWithPassword, isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [loginPending, setLoginPending] = useState(false);
+
+  // Email/password state
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) setLocation('/');
@@ -15,7 +21,19 @@ export function Login() {
   const handleLogin = () => {
     setLoginPending(true);
     login();
-    // Don't setLocation — the OAuth redirect will handle navigation
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) return;
+    setEmailError(null);
+    setEmailLoading(true);
+    const { error } = await loginWithPassword(email.trim(), password);
+    if (error) {
+      setEmailError(error);
+      setEmailLoading(false);
+    }
+    // On success, the onAuthStateChange in AuthProvider handles navigation
   };
 
   return (
@@ -42,9 +60,47 @@ export function Login() {
         <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-foreground mb-1">
           Lidtek CRM
         </h1>
-        <p className="text-foreground-muted text-sm mb-8">
+        <p className="text-foreground-muted text-sm mb-6">
           Sistema de Gestão de Projetos
         </p>
+
+        {/* Email/Password Login Form */}
+        <form onSubmit={handleEmailLogin} className="space-y-3 mb-5">
+          <input
+            id="login-email"
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30 transition-all"
+          />
+          <input
+            id="login-password"
+            type="password"
+            placeholder="Senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30 transition-all"
+          />
+          {emailError && (
+            <p className="text-xs text-red-500 text-left">{emailError}</p>
+          )}
+          <button
+            id="login-submit"
+            type="submit"
+            disabled={emailLoading || !email.trim() || !password.trim()}
+            className="w-full py-2.5 rounded-lg bg-primary text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {emailLoading ? 'Entrando...' : 'Entrar'}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-[11px] text-foreground-muted/50 uppercase tracking-widest">ou</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
 
         {/* Google Sign-In Button */}
         <button

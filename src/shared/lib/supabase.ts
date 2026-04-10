@@ -12,7 +12,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // ── HMR Singleton ──────────────────────────────────────────────────────────
 // During Vite HMR, re-importing this module would create a NEW Supabase client,
 // but the OLD one already holds the GoTrue auth lock in IndexedDB.
-// The new client then waits 5s for the lock — causing the console warning.
 // Solution: persist the instance on globalThis so HMR hot-swaps reuse it.
 // ─────────────────────────────────────────────────────────────────────────────
 declare global {
@@ -23,15 +22,19 @@ declare global {
 if (!globalThis.__supabaseClient) {
   globalThis.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-      // Use pkce flow for better security
-      flowType: 'pkce',
+      // Use implicit flow — no navigator locks, works perfectly for SPAs
+      flowType: 'implicit',
+      // Use localStorage instead of IndexedDB to avoid lock contention
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      storageKey: 'sb-lidtek-auth',
       // Persist session across reloads
       persistSession: true,
       // Detect session from URL for OAuth callbacks
       detectSessionInUrl: true,
+      // Disable the lock that causes "Lock was not released within 5000ms"
+      lock: null as any,
     },
   });
 }
 
 export const supabase = globalThis.__supabaseClient;
-

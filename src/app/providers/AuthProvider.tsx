@@ -13,7 +13,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: () => void;
-  logout: () => void;
+  loginWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -21,7 +22,8 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isLoading: true,
   login: () => {},
-  logout: () => {},
+  loginWithPassword: async () => ({ error: null }),
+  logout: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -261,12 +263,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const loginWithPassword = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message };
+    return { error: null };
+  }, []);
+
   const logout = useCallback(async () => {
+    // Clear state and cache IMMEDIATELY — don't wait for the 300ms guard
+    setUser(null);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    // Then sign out from Supabase
     await supabase.auth.signOut();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, loginWithPassword, logout }}>
       {children}
     </AuthContext.Provider>
   );
