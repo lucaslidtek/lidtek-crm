@@ -12,8 +12,10 @@ interface TeamMemberCardProps {
 const ROLE_CONFIG: Record<UserRole, { label: string; color: string; bg: string }> = {
   admin: { label: 'Admin', color: 'text-primary', bg: 'bg-primary/15' },
   manager: { label: 'Gestor', color: 'text-blue-light', bg: 'bg-blue-light/15' },
+  gestor: { label: 'Gestor', color: 'text-blue-light', bg: 'bg-blue-light/15' },
   collaborator: { label: 'Colaborador', color: 'text-success', bg: 'bg-success/15' },
   readonly: { label: 'Leitura', color: 'text-muted-foreground', bg: 'bg-muted/50' },
+  leitura: { label: 'Leitura', color: 'text-muted-foreground', bg: 'bg-muted/50' },
 };
 
 // Generate a stable gradient based on user initials

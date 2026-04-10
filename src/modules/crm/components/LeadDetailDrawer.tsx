@@ -5,6 +5,7 @@ import { cn } from '@/shared/utils/cn';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { useStore } from '@/shared/lib/store';
+import { usePermissions } from '@/shared/hooks/usePermissions';
 import { FUNNEL_STAGES, BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageColor } from '@/shared/lib/constants';
 import type { Lead, Interaction, ProjectType, BillingType, BillingCycle } from '@/shared/types/models';
 import { useState, useRef, useEffect } from 'react';
@@ -32,12 +33,15 @@ const interactionLabels: Record<Interaction['type'], string> = {
 
 export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
   const { getUserById, updateLead, convertLeadToProject, projects, users } = useStore();
+  const { canEdit, canEditAll } = usePermissions();
   const [, setLocation] = useLocation();
-  const [converting, setConverting] = useState(false);
+  const [converting, setConverting] = useState<boolean>(false);
   const [selectedType, setSelectedType] = useState<ProjectType>('oneshot');
 
   if (!lead) return null;
 
+  // Permission check: can this user edit this specific lead?
+  const editable = canEdit(lead.ownerId);
 
   const stageColor = getStageColor(FUNNEL_STAGES, lead.stage);
   const stageLabel = getStageLabel(FUNNEL_STAGES, lead.stage);
@@ -125,11 +129,13 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                   value={lead.name}
                   onSave={(v) => handleFieldSave('name', v)}
                   className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight"
+                  readOnly={!editable}
                 />
                 <EditableText
                   value={lead.contact}
                   onSave={(v) => handleFieldSave('contact', v)}
                   className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5"
+                  readOnly={!editable}
                 />
               </div>
 
@@ -145,14 +151,14 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                       icon={<DollarSign className="w-3.5 h-3.5" />}
                       label="Valor"
                       value={formattedValue}
-                      editable
+                      editable={editable}
                       onSave={(v) => handleFieldSave('estimatedValue', v)}
                     />
                     <FieldCard
                       icon={<Phone className="w-3.5 h-3.5" />}
                       label="Telefone"
                       value={lead.phone || ''}
-                      editable
+                      editable={editable}
                       onSave={(v) => handleFieldSave('phone', v)}
                       action={lead.phone ? (
                         <a 
@@ -200,6 +206,7 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                         value={lead.solutionType}
                         onSave={(v) => handleFieldSave('solutionType', v)}
                         className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                        readOnly={!editable}
                       />
                     </div>
                   )}
@@ -214,6 +221,7 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                       value={lead.notes || ''}
                       placeholder="Adicione uma descrição mais detalhada..."
                       onSave={(v) => handleFieldSave('notes', v)}
+                      readOnly={!editable}
                     />
                   </div>
 
@@ -225,8 +233,8 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                     </div>
                   )}
 
-                  {/* Convert to Project */}
-                  {canConvert && (
+                  {/* Convert to Project — only admin/gestor can convert */}
+                  {canConvert && canEditAll && (
                     <div className="rounded-lg p-4 space-y-3 bg-violet-50 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/30">
                       <div className="flex items-center gap-2">
                         <Briefcase className="w-4 h-4 text-violet-600 dark:text-violet-400" />
@@ -330,11 +338,12 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
 }
 
 /* ═══ Inline Editable Text ═══ */
-function EditableText({ value, onSave, className, placeholder }: {
+function EditableText({ value, onSave, className, placeholder, readOnly }: {
   value: string;
   onSave: (value: string) => void;
   className?: string;
   placeholder?: string;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -347,6 +356,10 @@ function EditableText({ value, onSave, className, placeholder }: {
     setEditing(false);
     if (draft.trim() !== value) onSave(draft.trim());
   };
+
+  if (readOnly) {
+    return <p className={className}>{value || <span className="text-zinc-400 italic">{placeholder || '—'}</span>}</p>;
+  }
 
   if (editing) {
     return (
@@ -374,10 +387,11 @@ function EditableText({ value, onSave, className, placeholder }: {
 }
 
 /* ═══ Inline Editable TextArea ═══ */
-function EditableTextArea({ value, onSave, placeholder }: {
+function EditableTextArea({ value, onSave, placeholder, readOnly }: {
   value: string;
   onSave: (value: string) => void;
   placeholder?: string;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -390,6 +404,14 @@ function EditableTextArea({ value, onSave, placeholder }: {
     setEditing(false);
     if (draft.trim() !== value) onSave(draft.trim());
   };
+
+  if (readOnly) {
+    return (
+      <div className="text-sm leading-relaxed rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-transparent min-h-[80px]">
+        {value ? <p className="text-zinc-700 dark:text-zinc-300">{value}</p> : <p className="text-zinc-400 italic">{placeholder || '—'}</p>}
+      </div>
+    );
+  }
 
   if (editing) {
     return (

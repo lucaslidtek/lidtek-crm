@@ -4,6 +4,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Input, Textarea } from '@/shared/components/ui/Input';
 import { Select, SelectItem } from '@/shared/components/ui/Select';
 import { useStore } from '@/shared/lib/store';
+import { useAuth } from '@/app/providers/AuthProvider';
 import type { TaskType, TaskPriority, TaskStatus } from '@/shared/types/models';
 
 interface TaskCreateDialogProps {
@@ -13,42 +14,55 @@ interface TaskCreateDialogProps {
 
 export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) {
   const { createTask, users, projects, leads } = useStore();
+  const { user: currentUser } = useAuth();
 
   const [title, setTitle] = useState('');
   const [type, setType] = useState<TaskType>('standalone');
   const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [ownerId, setOwnerId] = useState('user-1');
+  const [ownerId, setOwnerId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [description, setDescription] = useState('');
   const [projectId, setProjectId] = useState('');
   const [leadId, setLeadId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Effective owner: selected, or current user, or first user in list
+  const effectiveOwnerId = ownerId || currentUser?.id || users[0]?.id || '';
   const isValid = title.trim();
 
   const handleSubmit = async () => {
-    if (!isValid) return;
+    if (!isValid || !effectiveOwnerId) return;
     setLoading(true);
-    await createTask({
-      title: title.trim(),
-      description: description.trim() || undefined,
-      type,
-      status: 'todo' as TaskStatus,
-      priority,
-      ownerId,
-      dueDate: dueDate || undefined,
-      tags: [],
-      projectId: type === 'project' && projectId ? projectId : undefined,
-      leadId: type === 'sales' && leadId ? leadId : undefined,
-    });
-    setLoading(false);
-    // Reset
-    setTitle('');
-    setDescription('');
-    setDueDate('');
-    setProjectId('');
-    setLeadId('');
-    onOpenChange(false);
+    setError(null);
+    try {
+      await createTask({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        type,
+        status: 'todo' as TaskStatus,
+        priority,
+        ownerId: effectiveOwnerId,
+        dueDate: dueDate || undefined,
+        tags: [],
+        projectId: type === 'project' && projectId ? projectId : undefined,
+        leadId: type === 'sales' && leadId ? leadId : undefined,
+      });
+      // Reset on success
+      setTitle('');
+      setDescription('');
+      setOwnerId('');
+      setDueDate('');
+      setProjectId('');
+      setLeadId('');
+      onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao criar tarefa';
+      console.error('[TaskCreateDialog] createTask failed:', err);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,7 +92,7 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
               <SelectItem value="medium">Média</SelectItem>
               <SelectItem value="low">Baixa</SelectItem>
             </Select>
-            <Select label="Responsável" value={ownerId} onValueChange={setOwnerId} placeholder="Responsável">
+            <Select label="Responsável" value={effectiveOwnerId} onValueChange={setOwnerId} placeholder="Responsável">
               {users.map((u) => (
                 <SelectItem key={u.id} value={u.id}>{u.name.split(' ')[0]}</SelectItem>
               ))}
@@ -118,10 +132,13 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
         </div>
 
         <DialogFooter>
+          {error && (
+            <p className="text-xs text-red-500 text-left flex-1 mr-2">{error}</p>
+          )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={!isValid || loading}>
+          <Button onClick={handleSubmit} disabled={!isValid || loading || !effectiveOwnerId}>
             {loading ? 'Criando...' : 'Criar Tarefa'}
           </Button>
         </DialogFooter>

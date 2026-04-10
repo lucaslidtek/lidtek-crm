@@ -30,11 +30,13 @@ interface MemberDetailDrawerProps {
 const ROLE_CONFIG: Record<UserRole, { label: string; icon: typeof Crown; color: string; bg: string }> = {
   admin: { label: 'Administrador', icon: Crown, color: 'text-primary', bg: 'bg-primary/15' },
   manager: { label: 'Gestor', icon: Shield, color: 'text-blue-light', bg: 'bg-blue-light/15' },
+  gestor: { label: 'Gestor', icon: Shield, color: 'text-blue-light', bg: 'bg-blue-light/15' },
   collaborator: { label: 'Colaborador', icon: UserCheck, color: 'text-success', bg: 'bg-success/15' },
   readonly: { label: 'Somente Leitura', icon: Eye, color: 'text-muted-foreground', bg: 'bg-muted/50' },
+  leitura: { label: 'Somente Leitura', icon: Eye, color: 'text-muted-foreground', bg: 'bg-muted/50' },
 };
 
-const ROLES: UserRole[] = ['admin', 'manager', 'collaborator', 'readonly'];
+const ROLES: UserRole[] = ['admin', 'gestor', 'collaborator', 'readonly'];
 
 function getAvatarGradient(initials: string): string {
   const gradients = [

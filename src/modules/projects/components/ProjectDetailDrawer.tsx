@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/utils/cn';
 import { ProjectTypeBadge, Badge } from '@/shared/components/ui/Badge';
 import { useStore } from '@/shared/lib/store';
+import { usePermissions } from '@/shared/hooks/usePermissions';
 import { PROJECT_STAGES, getStageLabel, getStageColor } from '@/shared/lib/constants';
 import type { Project } from '@/shared/types/models';
 import { useLocation } from 'wouter';
@@ -18,9 +19,13 @@ interface ProjectDetailDrawerProps {
 
 export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerProps) {
   const { getUserById, leads, updateProject, updateSprint, completeSprint, deleteSprint, users } = useStore();
+  const { canEdit } = usePermissions();
   const [, setLocation] = useLocation();
 
   if (!project) return null;
+
+  // Can this user edit this specific project?
+  const editable = canEdit(project.ownerId);
 
   const handleFieldSave = async (field: keyof Project, value: string) => {
     if (!project || project[field] === value) return;
@@ -154,13 +159,15 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
                           <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{currentSprint.name}</p>
                           <div className="flex items-center gap-2">
                             <Badge color={stageColor}>{stageLabel}</Badge>
-                            <button
-                              onClick={() => completeSprint(currentSprint.id)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-semibold uppercase tracking-wider hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer"
-                            >
-                              <CheckCircle2 className="w-3 h-3" />
-                              Concluir
-                            </button>
+                            {editable && (
+                              <button
+                                onClick={() => completeSprint(currentSprint.id)}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-semibold uppercase tracking-wider hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                Concluir
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-4 text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -202,6 +209,7 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
                           onRename={(name) => updateSprint(sprint.id, { name })}
                           onComplete={() => completeSprint(sprint.id)}
                           onDelete={() => deleteSprint(sprint.id)}
+                          canEdit={editable}
                         />
                       );
                     })}
@@ -220,7 +228,7 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
 
 // ─── Timeline Sprint Row (Drawer) ─────────────────────
 
-function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename, onComplete, onDelete }: {
+function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename, onComplete, onDelete, canEdit }: {
   sprint: { id: string; name: string; status: string; startDate: string; endDate?: string; stage: string };
   isActive: boolean;
   stageColor: string;
@@ -228,6 +236,7 @@ function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename,
   onRename: (name: string) => void;
   onComplete: () => void;
   onDelete: () => void;
+  canEdit?: boolean;
 }) {
   const isCompleted = sprint.status === 'completed';
   const [editing, setEditing] = useState(false);
@@ -266,7 +275,7 @@ function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename,
           <div className="w-5 h-5 rounded-md bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
             <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
           </div>
-        ) : (
+        ) : canEdit ? (
           <button
             onClick={onComplete}
             className="w-5 h-5 rounded-md bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors group/check"
@@ -275,6 +284,10 @@ function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename,
             <Clock className="w-3 h-3 text-violet-600 dark:text-violet-400 group-hover/check:hidden" />
             <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 hidden group-hover/check:block" />
           </button>
+        ) : (
+          <div className="w-5 h-5 rounded-md bg-violet-100/50 dark:bg-violet-900/20 flex items-center justify-center flex-shrink-0">
+            <Clock className="w-3 h-3 text-violet-400" />
+          </div>
         )}
 
         {/* Name (double-click to edit) */}
@@ -304,8 +317,8 @@ function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename,
           </p>
         )}
 
-        {/* Action buttons (hover) */}
-        {!editing && (
+        {/* Action buttons (hover) — only for users with edit permission */}
+        {!editing && canEdit && (
           <div className="flex items-center gap-0.5 opacity-0 group-hover/tl:opacity-100 transition-opacity flex-shrink-0">
             {!isCompleted && (
               <button

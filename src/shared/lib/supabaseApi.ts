@@ -187,7 +187,7 @@ export const api = {
         .from('profiles')
         .select('*')
         .order('name');
-      if (error) { console.error('users.list error:', error); return []; }
+      if (error) throw new Error(`users.list: ${error.message}`);
       return (data ?? []).map(rowToUser);
     },
 
@@ -260,7 +260,7 @@ export const api = {
         .from('leads')
         .select('*, interactions(*)')
         .order('created_at', { ascending: false });
-      if (error) { console.error('leads.list error:', error); return []; }
+      if (error) throw new Error(`leads.list: ${error.message}`);
 
       // Fetch task IDs per lead
       const { data: tasks } = await supabase
@@ -359,7 +359,7 @@ export const api = {
         .from('projects')
         .select('*, sprints!sprints_project_id_fkey(*)')
         .order('created_at', { ascending: false });
-      if (error) { console.error('projects.list error:', error); return []; }
+      if (error) throw new Error(`projects.list: ${error.message}`);
 
       // Fetch task IDs per project
       const { data: tasks } = await supabase
@@ -564,7 +564,7 @@ export const api = {
         .from('tasks')
         .select('*')
         .order('created_at', { ascending: false });
-      if (error) { console.error('tasks.list error:', error); return []; }
+      if (error) throw new Error(`tasks.list: ${error.message}`);
       return (data ?? []).map(rowToTask);
     },
 

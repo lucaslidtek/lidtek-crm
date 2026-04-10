@@ -38,7 +38,9 @@ function authUserToProfile(authUser: { id: string; email?: string; user_metadata
     id: authUser.id,
     name: fullName,
     email: authUser.email ?? '',
-    role: 'admin',
+    // Use 'collaborator' as the safe fallback — the real role is loaded
+    // from the profiles table in loadProfile() and overwrites this value.
+    role: 'collaborator',
     initials,
     avatarUrl: meta['avatar_url'] ?? meta['picture'] ?? undefined,
     status: 'active',
@@ -90,28 +92,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(fallback);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
 
-    // Optionally enrich from the profiles table row
+    // Enrich from the profiles table — this resolves the real role and profile data
     try {
-      const { data } = await supabase
+      const { data: existing } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
         .maybeSingle();
 
-      if (data) {
+      if (existing) {
+        // Profile exists — use the real data from the database
         const profile: User = {
-          id: data.id,
-          name: data.name,
-          email: data.email,
-          role: data.role,
-          initials: data.initials,
-          avatarUrl: data.avatar_url ?? undefined,
-          phone: data.phone ?? undefined,
-          position: data.position ?? undefined,
-          status: data.status ?? 'active',
+          id: existing.id,
+          name: existing.name,
+          email: existing.email,
+          // Use the real role from the database — overwrites the 'collaborator' fallback
+          role: existing.role ?? 'collaborator',
+          initials: existing.initials,
+          avatarUrl: existing.avatar_url ?? undefined,
+          phone: existing.phone ?? undefined,
+          position: existing.position ?? undefined,
+          status: existing.status ?? 'active',
         };
         setUser(profile);
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
+      } else {
+        // Profile missing (trigger didn't run) — create it now.
+        // Use 'admin' as the role for the first user to bootstrap the system.
+        const { data: created } = await supabase
+          .from('profiles')
+          .insert({
+            id: fallback.id,
+            name: fallback.name,
+            email: fallback.email,
+            role: 'admin', // Bootstrap: first user who can auth is admin
+            initials: fallback.initials,
+            avatar_url: fallback.avatarUrl ?? null,
+            status: 'active',
+          })
+          .select()
+          .single();
+
+        if (created) {
+          const profile: User = {
+            id: created.id,
+            name: created.name,
+            email: created.email,
+            role: created.role ?? 'admin',
+            initials: created.initials,
+            avatarUrl: created.avatar_url ?? undefined,
+            status: created.status ?? 'active',
+          };
+          setUser(profile);
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
+        }
       }
     } catch {
       // Ignore — fallback is already set
@@ -133,8 +167,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cachedUser = localStorage.getItem(AUTH_STORAGE_KEY);
     if (cachedUser) {
       // User is cached — resolve immediately so the Store doesn't wait.
-      // onAuthStateChange below will still fire TOKEN_REFRESHED if needed.
       resolveLoading();
+
+      // Run loadProfile in the background to ensure the DB profile exists
+      // and to refresh the role/name from the database.
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (mounted && session?.user) {
+          loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+        }
+      }).catch(() => { /* ignore — cached user is already set */ });
+
       // Still subscribe for future auth changes (logout, token refresh)
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         async (event, session) => {
@@ -142,8 +184,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
             await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
           } else if (event === 'SIGNED_OUT') {
-            setUser(null);
-            localStorage.removeItem(AUTH_STORAGE_KEY);
+            // Guard: only clear if truly signed out (not a transient refresh cycle).
+            // Wait briefly to see if TOKEN_REFRESHED follows.
+            setTimeout(() => {
+              if (!mounted) return;
+              supabase.auth.getSession().then(({ data: { session: current } }) => {
+                if (!current) {
+                  setUser(null);
+                  localStorage.removeItem(AUTH_STORAGE_KEY);
+                }
+              });
+            }, 300);
           }
           resolveLoading();
         }
@@ -178,8 +229,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
           await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
         } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
+          // Guard: wait briefly before clearing to distinguish a real logout
+          // from a transient SIGNED_OUT that occurs during token refresh.
+          setTimeout(() => {
+            if (!mounted) return;
+            supabase.auth.getSession().then(({ data: { session: current } }) => {
+              if (!current) {
+                setUser(null);
+                localStorage.removeItem(AUTH_STORAGE_KEY);
+              }
+            });
+          }, 300);
         }
         // Always ensure loading is resolved (safety net for edge cases)
         resolveLoading();

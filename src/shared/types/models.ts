@@ -38,7 +38,7 @@ export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'blocked';
 
 export type TaskPriority = 'high' | 'medium' | 'low';
 
-export type UserRole = 'admin' | 'manager' | 'collaborator' | 'readonly';
+export type UserRole = 'admin' | 'gestor' | 'manager' | 'collaborator' | 'readonly' | 'leitura';
 
 // --- Models ---
 

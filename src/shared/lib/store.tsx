@@ -89,79 +89,118 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const fetchedRef = useRef(false);
 
   const refreshLeads = useCallback(async () => {
-    const fresh = await api.leads.list();
-    setLeads(current => {
-      if (current.length === 0) return fresh;
-      const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
-      return fresh.sort((a, b) => {
-        const orderA = orderMap.get(a.id) ?? 99999;
-        const orderB = orderMap.get(b.id) ?? 99999;
-        return orderA - orderB;
+    try {
+      const fresh = await api.leads.list();
+      setLeads(current => {
+        if (current.length === 0) return fresh;
+        const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
+        return fresh.sort((a, b) => {
+          const orderA = orderMap.get(a.id) ?? 99999;
+          const orderB = orderMap.get(b.id) ?? 99999;
+          return orderA - orderB;
+        });
       });
-    });
+    } catch (err) {
+      console.warn('[Store] refreshLeads failed — preserving existing state:', err);
+    }
   }, []);
 
   const refreshProjects = useCallback(async () => {
-    const fresh = await api.projects.list();
-    setProjects(current => {
-      if (current.length === 0) return fresh;
-      const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
-      return fresh.sort((a, b) => {
-        const orderA = orderMap.get(a.id) ?? 99999;
-        const orderB = orderMap.get(b.id) ?? 99999;
-        return orderA - orderB;
+    try {
+      const fresh = await api.projects.list();
+      setProjects(current => {
+        if (current.length === 0) return fresh;
+        const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
+        return fresh.sort((a, b) => {
+          const orderA = orderMap.get(a.id) ?? 99999;
+          const orderB = orderMap.get(b.id) ?? 99999;
+          return orderA - orderB;
+        });
       });
-    });
+    } catch (err) {
+      console.warn('[Store] refreshProjects failed — preserving existing state:', err);
+    }
   }, []);
 
   const refreshTasks = useCallback(async () => {
-    const fresh = await api.tasks.list();
-    setTasks(current => {
-      if (current.length === 0) return fresh;
-      const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
-      return fresh.sort((a, b) => {
-        const orderA = orderMap.get(a.id) ?? 99999;
-        const orderB = orderMap.get(b.id) ?? 99999;
-        return orderA - orderB;
+    try {
+      const fresh = await api.tasks.list();
+      setTasks(current => {
+        if (current.length === 0) return fresh;
+        const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
+        return fresh.sort((a, b) => {
+          const orderA = orderMap.get(a.id) ?? 99999;
+          const orderB = orderMap.get(b.id) ?? 99999;
+          return orderA - orderB;
+        });
       });
-    });
+    } catch (err) {
+      console.warn('[Store] refreshTasks failed — preserving existing state:', err);
+    }
   }, []);
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      const u = await api.users.list();
-      const [l, p, t] = await Promise.all([
+      const [u, l, p, t] = await Promise.all([
+        api.users.list(),
         api.leads.list(),
         api.projects.list(),
         api.tasks.list(),
       ]);
-      setUsers(u);
+
+      // If users returned empty, the profile may still be being created (upsert race).
+      // Retry once after 2s to catch the bootstrapped profile.
+      const resolvedUsers = u.length > 0 ? u : await new Promise<typeof u>((resolve) => {
+        setTimeout(async () => {
+          try {
+            resolve(await api.users.list());
+          } catch {
+            resolve(u); // Return original empty array on error
+          }
+        }, 2000);
+      });
+
+      setUsers(resolvedUsers);
       setLeads(l);
       setProjects(p);
       setTasks(t);
       // Populate module-level cache so HMR remounts restore data instantly
-      _cache = { leads: l, projects: p, tasks: t, users: u };
+      _cache = { leads: l, projects: p, tasks: t, users: resolvedUsers };
     } catch (err) {
-      console.error('[Store] refreshAll failed:', err);
+      // DON'T wipe state on error — preserve whatever is in state already.
+      // The user sees stale data rather than an empty screen.
+      console.error('[Store] refreshAll failed — preserving existing state:', err);
     }
     setLoading(false);
   }, []);
+
 
   // ─── Auth-driven data loading ───
   // Only fetch data when auth confirms the user is logged in.
   // On logout, clear all data. On HMR, if auth is already confirmed
   // from localStorage cache, data loads immediately.
+  //
+  // IMPORTANT: Only use the HMR cache if it actually contains data.
+  // An empty cache (e.g. poisoned by a prior failed fetch) must NOT
+  // block the next legitimate fetch attempt.
   useEffect(() => {
     if (authLoading) return; // Auth still initializing — wait
 
     if (isAuthenticated) {
-      // If cache is populated (HMR scenario), skip fetch — data already in state
-      if (_cache !== null) {
+      // Use cache only when it has real data (guards against poisoned empty cache)
+      const cacheIsValid =
+        _cache !== null &&
+        (_cache.leads.length > 0 ||
+          _cache.projects.length > 0 ||
+          _cache.tasks.length > 0 ||
+          _cache.users.length > 0);
+
+      if (cacheIsValid) {
         fetchedRef.current = true;
         return;
       }
-      // Cold start — fetch from Supabase
+      // Cold start OR invalidated cache — fetch from Supabase
       if (!fetchedRef.current) {
         fetchedRef.current = true;
         refreshAll();

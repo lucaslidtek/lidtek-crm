@@ -5,6 +5,7 @@ import { Input, Textarea } from '@/shared/components/ui/Input';
 import { Select, SelectItem } from '@/shared/components/ui/Select';
 import { useLeads } from '@/modules/crm/hooks/useLeads';
 import { useStore } from '@/shared/lib/store';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { LEAD_ORIGINS, BILLING_TYPES, BILLING_CYCLES } from '@/shared/lib/constants';
 import type { FunnelStage, BillingType, BillingCycle } from '@/shared/types/models';
 
@@ -16,15 +17,21 @@ interface LeadCreateDialogProps {
 export function LeadCreateDialog({ open, onOpenChange }: LeadCreateDialogProps) {
   const { createLead } = useLeads();
   const { users } = useStore();
+  const { user: currentUser } = useAuth();
 
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [origin, setOrigin] = useState('');
-  const [ownerId, setOwnerId] = useState('user-1');
+  // Use the real authenticated user's ID as the default owner
+  const [ownerId, setOwnerId] = useState('');
   const [notes, setNotes] = useState('');
   const [billingType, setBillingType] = useState<BillingType | ''>('');
   const [billingCycle, setBillingCycle] = useState<BillingCycle | ''>('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Resolve the effective owner: the selected value, or fall back to current user, or first user
+  const effectiveOwnerId = ownerId || currentUser?.id || users[0]?.id || '';
 
   const isValid = name.trim() && contact.trim();
 
@@ -36,27 +43,36 @@ export function LeadCreateDialog({ open, onOpenChange }: LeadCreateDialogProps) 
   };
 
   const handleSubmit = async () => {
-    if (!isValid) return;
+    if (!isValid || !effectiveOwnerId) return;
     setLoading(true);
-    await createLead({
-      name: name.trim(),
-      contact: contact.trim(),
-      origin: origin || 'Outros',
-      ownerId,
-      notes: notes.trim(),
-      stage: 'prospecting' as FunnelStage,
-      ...(billingType ? { billingType: billingType as BillingType } : {}),
-      ...(billingType === 'recurring' && billingCycle ? { billingCycle: billingCycle as BillingCycle } : {}),
-    });
-    setLoading(false);
-    // Reset
-    setName('');
-    setContact('');
-    setOrigin('');
-    setNotes('');
-    setBillingType('');
-    setBillingCycle('');
-    onOpenChange(false);
+    setError(null);
+    try {
+      await createLead({
+        name: name.trim(),
+        contact: contact.trim(),
+        origin: origin || 'Outros',
+        ownerId: effectiveOwnerId,
+        notes: notes.trim(),
+        stage: 'prospecting' as FunnelStage,
+        ...(billingType ? { billingType: billingType as BillingType } : {}),
+        ...(billingType === 'recurring' && billingCycle ? { billingCycle: billingCycle as BillingCycle } : {}),
+      });
+      // Reset form on success
+      setName('');
+      setContact('');
+      setOrigin('');
+      setOwnerId('');
+      setNotes('');
+      setBillingType('');
+      setBillingCycle('');
+      onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao criar lead';
+      console.error('[LeadCreateDialog] createLead failed:', err);
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -93,7 +109,7 @@ export function LeadCreateDialog({ open, onOpenChange }: LeadCreateDialogProps) 
             </Select>
             <Select
               label="Responsável"
-              value={ownerId}
+              value={effectiveOwnerId}
               onValueChange={setOwnerId}
               placeholder="Selecione..."
             >
@@ -136,10 +152,13 @@ export function LeadCreateDialog({ open, onOpenChange }: LeadCreateDialogProps) 
         </div>
 
         <DialogFooter>
+          {error && (
+            <p className="text-xs text-red-500 text-left flex-1 mr-2">{error}</p>
+          )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={!isValid || loading}>
+          <Button onClick={handleSubmit} disabled={!isValid || loading || !effectiveOwnerId}>
             {loading ? 'Criando...' : 'Criar Lead'}
           </Button>
         </DialogFooter>
