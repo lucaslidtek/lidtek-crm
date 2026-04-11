@@ -82,15 +82,26 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
 
     for (const project of projects) {
       for (const sprint of project.sprints) {
-        const startDate = new Date(sprint.startDate);
-        const startKey = formatDateKey(startDate);
-
-        if (startDate.getMonth() === currentMonth && startDate.getFullYear() === currentYear) {
-          if (!map.has(startKey)) map.set(startKey, []);
-          map.get(startKey)!.push({ sprint, project, type: 'start' });
+        // Use dueDate (previsão) as the primary calendar date for active sprints
+        if (sprint.dueDate && sprint.status !== 'completed') {
+          const dueD = new Date(sprint.dueDate);
+          const dueKey = formatDateKey(dueD);
+          if (dueD.getMonth() === currentMonth && dueD.getFullYear() === currentYear) {
+            if (!map.has(dueKey)) map.set(dueKey, []);
+            map.get(dueKey)!.push({ sprint, project, type: 'start' });
+          }
+        } else if (!sprint.dueDate && sprint.status !== 'completed') {
+          // Fallback to startDate if no dueDate set
+          const startDate = new Date(sprint.startDate);
+          const startKey = formatDateKey(startDate);
+          if (startDate.getMonth() === currentMonth && startDate.getFullYear() === currentYear) {
+            if (!map.has(startKey)) map.set(startKey, []);
+            map.get(startKey)!.push({ sprint, project, type: 'start' });
+          }
         }
 
-        if (sprint.endDate) {
+        // Completed sprints show on their endDate
+        if (sprint.endDate && sprint.status === 'completed') {
           const endDate = new Date(sprint.endDate);
           const endKey = formatDateKey(endDate);
           if (endDate.getMonth() === currentMonth && endDate.getFullYear() === currentYear) {
@@ -307,7 +318,7 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
                       </span>
                       <span className="text-foreground-muted/30">·</span>
                       <span className="text-[11px] text-foreground-muted">
-                        {event.type === 'start' ? 'Iniciada' : 'Concluída'}
+                        {event.type === 'start' ? 'Previsão' : 'Concluída'}
                       </span>
                     </div>
                   </div>

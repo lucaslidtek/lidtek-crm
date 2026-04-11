@@ -70,7 +70,9 @@ function rowToSprint(row: any): Sprint {
     projectId: row.project_id,
     name: row.name,
     stage: row.stage,
+    priority: row.priority ?? 'medium',
     startDate: row.start_date,
+    dueDate: row.due_date ?? undefined,
     endDate: row.end_date ?? undefined,
     status: row.status,
     taskIds: [], // Will be populated below
@@ -495,7 +497,9 @@ export const api = {
           project_id: projectId,
           name: input.name,
           stage: input.stage,
+          priority: input.priority ?? 'medium',
           start_date: input.startDate,
+          due_date: input.dueDate,
           end_date: input.endDate,
           status: input.status,
         })
@@ -516,7 +520,9 @@ export const api = {
       const payload: Record<string, any> = {};
       if (updates.name !== undefined) payload.name = updates.name;
       if (updates.stage !== undefined) payload.stage = updates.stage;
+      if (updates.priority !== undefined) payload.priority = updates.priority;
       if (updates.startDate !== undefined) payload.start_date = updates.startDate;
+      if (updates.dueDate !== undefined) payload.due_date = updates.dueDate;
       if (updates.endDate !== undefined) payload.end_date = updates.endDate;
       if (updates.status !== undefined) payload.status = updates.status;
 
@@ -548,6 +554,12 @@ export const api = {
         .select('project_id')
         .eq('id', sprintId)
         .single();
+
+      // Nullify sprint_id on any tasks referencing this sprint (avoids FK constraint)
+      await supabase
+        .from('tasks')
+        .update({ sprint_id: null, updated_at: new Date().toISOString() })
+        .eq('sprint_id', sprintId);
 
       const { error } = await supabase
         .from('sprints')

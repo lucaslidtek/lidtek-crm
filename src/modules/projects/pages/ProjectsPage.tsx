@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useStore } from '@/shared/lib/store';
 import { KanbanBoard } from '@/shared/components/kanban/KanbanBoard';
 import { ProjectCard } from '@/modules/projects/components/ProjectCard';
@@ -8,10 +8,12 @@ import { cn } from '@/shared/utils/cn';
 import { ViewToggle, type ViewType } from '@/shared/components/ui/ViewToggle';
 import { ProjectListView } from '@/modules/projects/components/ProjectListView';
 import { ProjectCalendarView } from '@/modules/projects/components/ProjectCalendarView';
+import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { PROJECT_STAGES } from '@/shared/lib/constants';
-import type { Project, ProjectType } from '@/shared/types/models';
+import type { Project, ProjectType, ProjectStatus } from '@/shared/types/models';
 
 type FilterType = 'all' | ProjectType;
+type StatusFilter = 'all' | ProjectStatus;
 
 const FILTER_OPTIONS: { id: FilterType; label: string }[] = [
   { id: 'all', label: 'Todos' },
@@ -19,76 +21,194 @@ const FILTER_OPTIONS: { id: FilterType; label: string }[] = [
   { id: 'oneshot', label: 'Únicos' },
 ];
 
+const STATUS_OPTIONS: { id: StatusFilter; label: string }[] = [
+  { id: 'all', label: 'Todos' },
+  { id: 'active', label: 'Ativos' },
+  { id: 'paused', label: 'Pausados' },
+  { id: 'completed', label: 'Concluídos' },
+];
+
+function getProjectSortScore(project: Project): { rank: number; dueTimestamp: number } {
+  const activeSprints = project.sprints.filter(s => s.status === 'active');
+
+  if (activeSprints.length === 0) {
+    return { rank: 1, dueTimestamp: Infinity };
+  }
+
+  const now = Date.now();
+  let closestDue = Infinity;
+  let hasAnyDueDate = false;
+
+  for (const sprint of activeSprints) {
+    if (sprint.dueDate) {
+      hasAnyDueDate = true;
+      const due = new Date(sprint.dueDate).getTime();
+      if (Math.abs(due - now) < Math.abs(closestDue - now)) {
+        closestDue = due;
+      }
+    }
+  }
+
+  if (!hasAnyDueDate) {
+    return { rank: 0, dueTimestamp: Infinity };
+  }
+
+  if (closestDue < now) {
+    return { rank: -2, dueTimestamp: closestDue };
+  }
+
+  return { rank: -1, dueTimestamp: closestDue };
+}
+
 export function ProjectsPage() {
   const [filterType, setFilterType] = useState<FilterType>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [search, setSearch] = useState('');
   const { projects, projectsByStage } = useProjects(filterType);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [view, setView] = useState<ViewType>('list');
   const { projects: allProjects } = useStore();
 
-  // Always derive the selected project from the live store data
   const selectedProject = selectedProjectId ? allProjects.find(p => p.id === selectedProjectId) ?? null : null;
 
-  return (
-    <div className="animate-fade-in">
-      {/* Page Header */}
-      <div className="flex items-end justify-between mb-6">
-        <div>
-          <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-foreground">
-            Projetos
-            <span className="text-foreground-muted/40 font-semibold text-lg ml-2">({projects.length})</span>
-          </h1>
-          <p className="text-sm text-foreground-muted mt-0.5">Funil de desenvolvimento</p>
-        </div>
+  const filteredProjects = useMemo(() => {
+    let result = projects;
 
-        {/* Search / Filters / View */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 p-1 glass-subtle rounded-lg">
-            {FILTER_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                onClick={() => setFilterType(option.id)}
-                className={cn(
-                  'px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-300',
-                  filterType === option.id
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <ViewToggle view={view} onChange={setView} />
-        </div>
+    if (statusFilter !== 'all') {
+      result = result.filter(p => p.status === statusFilter);
+    }
+
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(p =>
+        p.clientName.toLowerCase().includes(q)
+      );
+    }
+
+    return [...result].sort((a, b) => {
+      const scoreA = getProjectSortScore(a);
+      const scoreB = getProjectSortScore(b);
+
+      if (scoreA.rank !== scoreB.rank) return scoreA.rank - scoreB.rank;
+
+      if (scoreA.dueTimestamp !== Infinity && scoreB.dueTimestamp !== Infinity) {
+        return scoreA.dueTimestamp - scoreB.dueTimestamp;
+      }
+
+      return 0;
+    });
+  }, [projects, statusFilter, search]);
+
+  const filteredProjectsByStage = useMemo(() => {
+    let stageProjects = projectsByStage;
+
+    if (statusFilter !== 'all') {
+      stageProjects = Object.fromEntries(
+        Object.entries(stageProjects).map(([stage, projects]) => [
+          stage,
+          projects.filter(p => p.status === statusFilter),
+        ])
+      );
+    }
+
+    if (!search) return stageProjects;
+    const q = search.toLowerCase();
+    return Object.fromEntries(
+      Object.entries(stageProjects).map(([stage, stageProjects]) => [
+        stage,
+        stageProjects.filter(p =>
+          p.clientName.toLowerCase().includes(q)
+        ),
+      ])
+    );
+  }, [projectsByStage, statusFilter, search]);
+
+  return (
+    <div className="animate-fade-in flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      {/* Utility bar */}
+      <div className="flex-shrink-0">
+        <PageHeader
+          searchQuery={search}
+          onSearchChange={setSearch}
+          searchPlaceholder={`Buscar entre ${filteredProjects.length} projeto${filteredProjects.length !== 1 ? 's' : ''}...`}
+          actions={
+            <>
+              {/* Type filter chips */}
+              <div className="flex items-center gap-1 p-1 glass-subtle rounded-lg">
+                {FILTER_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setFilterType(option.id)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer',
+                      filterType === option.id
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Status filter chips */}
+              <div className="flex items-center gap-1 p-1 glass-subtle rounded-lg">
+                {STATUS_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setStatusFilter(option.id)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer',
+                      statusFilter === option.id
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              <ViewToggle view={view} onChange={setView} />
+            </>
+          }
+        />
       </div>
 
-      {/* Content based on view */}
-      {view === 'list' ? (
-        <ProjectListView 
-          projects={projects}
-          onProjectClick={(project) => setSelectedProjectId(project.id)}
-        />
-      ) : view === 'calendar' ? (
-        <ProjectCalendarView
-          projects={projects}
-          onProjectClick={(project) => setSelectedProjectId(project.id)}
-        />
-      ) : (
-        <KanbanBoard<Project>
-          columns={PROJECT_STAGES}
-          items={projectsByStage}
-          onMoveItem={() => {}} // Projects don't move by drag — they move by sprint updates
-          renderCard={(project) => <ProjectCard project={project} />}
-          onCardClick={(project) => setSelectedProjectId(project.id)}
-        />
-      )}
+      {/* Content: Main + Detail Panel side by side */}
+      <div className="flex flex-1 min-h-0 gap-4">
+        {/* Main content — container with rounded corners */}
+        <div className={cn(
+          "flex-1 min-w-0 h-full rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40",
+          view === 'kanban' ? 'overflow-hidden' : 'overflow-y-auto p-4'
+        )}>
+          {view === 'list' ? (
+            <ProjectListView
+              projects={filteredProjects}
+              onProjectClick={(project) => setSelectedProjectId(project.id)}
+            />
+          ) : view === 'calendar' ? (
+            <ProjectCalendarView
+              projects={filteredProjects}
+              onProjectClick={(project) => setSelectedProjectId(project.id)}
+            />
+          ) : (
+            <KanbanBoard<Project>
+              columns={PROJECT_STAGES}
+              items={filteredProjectsByStage}
+              onMoveItem={() => {}}
+              renderCard={(project) => <ProjectCard project={project} />}
+              onCardClick={(project) => setSelectedProjectId(project.id)}
+            />
+          )}
+        </div>
 
-      {/* Detail Drawer */}
-      <ProjectDetailDrawer
-        project={selectedProject}
-        onClose={() => setSelectedProjectId(null)}
-      />
+        {/* Detail Side Panel — inline, beside content */}
+        <ProjectDetailDrawer
+          project={selectedProject}
+          onClose={() => setSelectedProjectId(null)}
+        />
+      </div>
     </div>
   );
 }

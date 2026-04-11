@@ -1,8 +1,13 @@
-import type { Project } from '@/shared/types/models';
+import type { Project, Sprint } from '@/shared/types/models';
 
 const now = new Date();
 const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000).toISOString();
 const daysFromNow = (d: number) => new Date(now.getTime() + d * 86400000).toISOString();
+
+const sprint = (s: Omit<Sprint, 'taskIds'> & { taskIds?: string[] }): Sprint => ({
+  taskIds: [],
+  ...s,
+});
 
 export const mockProjects: Project[] = [
   // --- Recorrentes (4) ---
@@ -15,8 +20,8 @@ export const mockProjects: Project[] = [
     ownerId: 'user-3',
     currentSprintId: 'spr-1b',
     sprints: [
-      { id: 'spr-1a', projectId: 'proj-1', name: 'Onboarding — Setup inicial', stage: 'onboarding', startDate: daysAgo(60), endDate: daysAgo(50), status: 'completed', taskIds: [] },
-      { id: 'spr-1b', projectId: 'proj-1', name: 'Manutenção — Sprint 8', stage: 'support', startDate: daysAgo(7), status: 'active', taskIds: ['task-p1', 'task-p2'] },
+      sprint({ id: 'spr-1a', projectId: 'proj-1', name: 'Onboarding — Setup inicial', stage: 'onboarding', priority: 'medium', startDate: daysAgo(60), endDate: daysAgo(50), status: 'completed' }),
+      sprint({ id: 'spr-1b', projectId: 'proj-1', name: 'Manutenção — Sprint 8', stage: 'support', priority: 'medium', startDate: daysAgo(7), status: 'active', taskIds: ['task-p1', 'task-p2'] }),
     ],
     taskIds: ['task-p1', 'task-p2'],
     nextDeliveryDate: daysFromNow(5),
@@ -33,9 +38,9 @@ export const mockProjects: Project[] = [
     ownerId: 'user-3',
     currentSprintId: 'spr-2c',
     sprints: [
-      { id: 'spr-2a', projectId: 'proj-2', name: 'Onboarding — Migração de dados', stage: 'onboarding', startDate: daysAgo(45), endDate: daysAgo(38), status: 'completed', taskIds: [] },
-      { id: 'spr-2b', projectId: 'proj-2', name: 'Desenvolvimento — Sprint 1', stage: 'development', startDate: daysAgo(38), endDate: daysAgo(24), status: 'completed', taskIds: [] },
-      { id: 'spr-2c', projectId: 'proj-2', name: 'Desenvolvimento — Sprint 3', stage: 'development', startDate: daysAgo(10), status: 'active', taskIds: ['task-p3'] },
+      sprint({ id: 'spr-2a', projectId: 'proj-2', name: 'Onboarding — Migração de dados', stage: 'onboarding', priority: 'medium', startDate: daysAgo(45), endDate: daysAgo(38), status: 'completed' }),
+      sprint({ id: 'spr-2b', projectId: 'proj-2', name: 'Desenvolvimento — Sprint 1', stage: 'development', priority: 'medium', startDate: daysAgo(38), endDate: daysAgo(24), status: 'completed' }),
+      sprint({ id: 'spr-2c', projectId: 'proj-2', name: 'Desenvolvimento — Sprint 3', stage: 'development', priority: 'high', startDate: daysAgo(10), status: 'active', taskIds: ['task-p3'] }),
     ],
     taskIds: ['task-p3'],
     nextDeliveryDate: daysFromNow(3),
@@ -52,8 +57,8 @@ export const mockProjects: Project[] = [
     ownerId: 'user-4',
     currentSprintId: 'spr-3b',
     sprints: [
-      { id: 'spr-3a', projectId: 'proj-3', name: 'Levantamento e Arquitetura', stage: 'architecture', startDate: daysAgo(30), endDate: daysAgo(20), status: 'completed', taskIds: [] },
-      { id: 'spr-3b', projectId: 'proj-3', name: 'Revisão — Reunião cliente', stage: 'review', startDate: daysAgo(5), status: 'active', taskIds: ['task-p4', 'task-p5'] },
+      sprint({ id: 'spr-3a', projectId: 'proj-3', name: 'Levantamento e Arquitetura', stage: 'architecture', priority: 'medium', startDate: daysAgo(30), endDate: daysAgo(20), status: 'completed' }),
+      sprint({ id: 'spr-3b', projectId: 'proj-3', name: 'Revisão — Reunião cliente', stage: 'review', priority: 'low', startDate: daysAgo(5), status: 'active', taskIds: ['task-p4', 'task-p5'] }),
     ],
     taskIds: ['task-p4', 'task-p5'],
     nextDeliveryDate: daysFromNow(8),
@@ -70,7 +75,7 @@ export const mockProjects: Project[] = [
     ownerId: 'user-3',
     currentSprintId: 'spr-4a',
     sprints: [
-      { id: 'spr-4a', projectId: 'proj-4', name: 'Desenvolvimento — Sprint 2', stage: 'development', startDate: daysAgo(15), status: 'active', taskIds: [] },
+      sprint({ id: 'spr-4a', projectId: 'proj-4', name: 'Desenvolvimento — Sprint 2', stage: 'development', priority: 'medium', startDate: daysAgo(15), status: 'active' }),
     ],
     taskIds: [],
     leadId: 'lead-closed-4',
@@ -88,8 +93,8 @@ export const mockProjects: Project[] = [
     ownerId: 'user-4',
     currentSprintId: 'spr-5b',
     sprints: [
-      { id: 'spr-5a', projectId: 'proj-5', name: 'Kickoff — Definição de escopo', stage: 'onboarding', startDate: daysAgo(20), endDate: daysAgo(15), status: 'completed', taskIds: [] },
-      { id: 'spr-5b', projectId: 'proj-5', name: 'Desenvolvimento — Sprint 1', stage: 'development', startDate: daysAgo(14), status: 'active', taskIds: ['task-p6'] },
+      sprint({ id: 'spr-5a', projectId: 'proj-5', name: 'Kickoff — Definição de escopo', stage: 'onboarding', priority: 'medium', startDate: daysAgo(20), endDate: daysAgo(15), status: 'completed' }),
+      sprint({ id: 'spr-5b', projectId: 'proj-5', name: 'Desenvolvimento — Sprint 1', stage: 'development', priority: 'high', startDate: daysAgo(14), status: 'active', taskIds: ['task-p6'] }),
     ],
     taskIds: ['task-p6'],
     nextDeliveryDate: daysFromNow(12),
@@ -106,8 +111,8 @@ export const mockProjects: Project[] = [
     ownerId: 'user-3',
     currentSprintId: 'spr-6b',
     sprints: [
-      { id: 'spr-6a', projectId: 'proj-6', name: 'Arquitetura — Definição técnica', stage: 'architecture', startDate: daysAgo(18), endDate: daysAgo(12), status: 'completed', taskIds: [] },
-      { id: 'spr-6b', projectId: 'proj-6', name: 'Homologação — Testes com cliente', stage: 'homologation', startDate: daysAgo(5), status: 'active', taskIds: ['task-p7'] },
+      sprint({ id: 'spr-6a', projectId: 'proj-6', name: 'Arquitetura — Definição técnica', stage: 'architecture', priority: 'medium', startDate: daysAgo(18), endDate: daysAgo(12), status: 'completed' }),
+      sprint({ id: 'spr-6b', projectId: 'proj-6', name: 'Homologação — Testes com cliente', stage: 'homologation', priority: 'medium', startDate: daysAgo(5), status: 'active', taskIds: ['task-p7'] }),
     ],
     taskIds: ['task-p7'],
     nextDeliveryDate: daysFromNow(2),
@@ -124,7 +129,7 @@ export const mockProjects: Project[] = [
     ownerId: 'user-4',
     currentSprintId: 'spr-7a',
     sprints: [
-      { id: 'spr-7a', projectId: 'proj-7', name: 'Deploy — Publicação em produção', stage: 'deploy', startDate: daysAgo(3), status: 'active', taskIds: ['task-p8'] },
+      sprint({ id: 'spr-7a', projectId: 'proj-7', name: 'Deploy — Publicação em produção', stage: 'deploy', priority: 'high', startDate: daysAgo(3), status: 'active', taskIds: ['task-p8'] }),
     ],
     taskIds: ['task-p8'],
     nextDeliveryDate: daysFromNow(1),
@@ -140,7 +145,7 @@ export const mockProjects: Project[] = [
     status: 'completed',
     ownerId: 'user-3',
     sprints: [
-      { id: 'spr-8a', projectId: 'proj-8', name: 'Projeto completo', stage: 'deploy', startDate: daysAgo(90), endDate: daysAgo(20), status: 'completed', taskIds: [] },
+      sprint({ id: 'spr-8a', projectId: 'proj-8', name: 'Projeto completo', stage: 'deploy', priority: 'medium', startDate: daysAgo(90), endDate: daysAgo(20), status: 'completed' }),
     ],
     taskIds: [],
     leadId: 'lead-won-6',

@@ -1,4 +1,4 @@
-import { X, Calendar, Mail, Phone, FileText, MessageSquare, Briefcase, ArrowRight, Tag, User, DollarSign, Edit3, Check, Repeat, Zap, Globe, Building2, MapPin, Plus, Trash2, Image as ImageIcon, ExternalLink, ChevronDown, AlertTriangle } from 'lucide-react';
+import { X, Calendar, Mail, Phone, FileText, MessageSquare, Briefcase, ArrowRight, Tag, User, Edit3, Check, Globe, Plus, Trash2, Image as ImageIcon, ChevronDown, AlertTriangle, ChevronRight, ListTodo } from 'lucide-react';
 import { WhatsAppIcon } from '@/shared/components/icons/WhatsAppIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/utils/cn';
@@ -8,7 +8,6 @@ import { useStore } from '@/shared/lib/store';
 import { LEAD_ORIGINS, BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageColor } from '@/shared/lib/constants';
 import type { Lead, Interaction, ProjectType, BillingType, BillingCycle, FunnelStage } from '@/shared/types/models';
 import { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 
 interface LeadDetailDrawerProps {
@@ -31,27 +30,40 @@ const interactionLabels: Record<Interaction['type'], string> = {
 };
 
 export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
-  const { getUserById, updateLead, deleteLead, convertLeadToProject, projects, users, funnelColumns, moveLeadStage } = useStore();
+  const { getUserById, updateLead, deleteLead, convertLeadToProject, projects, tasks, users, funnelColumns, moveLeadStage, createTask } = useStore();
   const [, setLocation] = useLocation();
   const [converting, setConverting] = useState<boolean>(false);
   const [selectedType, setSelectedType] = useState<ProjectType>('oneshot');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
+  const [addingTask, setAddingTask] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const taskInputRef = useRef<HTMLInputElement>(null);
 
-  if (!lead) return null;
+  // Reset states when lead changes
+  useEffect(() => {
+    setConfirmDelete(false);
+    setDeleting(false);
+    setShowActivity(false);
+    setAddingTask(false);
+    setNewTaskTitle('');
+  }, [lead?.id]);
 
-  // Permission: any authenticated user can edit/delete leads in this internal CRM.
-  // The 2-step confirmation provides safety for destructive actions.
+  // All derived state must be computed even when lead is null (for AnimatePresence to work)
   const editable = true;
-  const canDeleteLead = true;
+  const stageColor = lead ? getStageColor(funnelColumns, lead.stage) : '#A3A3A3';
+  const stageLabel = lead ? getStageLabel(funnelColumns, lead.stage) : '';
+  const isOverdue = lead?.nextContactDate && new Date(lead.nextContactDate) < new Date();
+  const linkedProject = lead ? projects.find(p => p.leadId === lead.id) : undefined;
+  const hasProject = !!linkedProject;
+  const canConvert = lead ? (lead.stage === 'contract_signed' || lead.stage === 'contract_sent') && !hasProject : false;
 
-  const stageColor = getStageColor(funnelColumns, lead.stage);
-  const stageLabel = getStageLabel(funnelColumns, lead.stage);
-  const isOverdue = lead.nextContactDate && new Date(lead.nextContactDate) < new Date();
-  const hasProject = projects.some(p => p.leadId === lead.id);
-  const canConvert = (lead.stage === 'contract_signed' || lead.stage === 'contract_sent') && !hasProject;
+  // Tasks linked to this lead
+  const linkedTasks = lead ? tasks.filter(t => t.leadId === lead.id) : [];
 
   const handleConvert = async () => {
+    if (!lead) return;
     setConverting(true);
     try {
       await convertLeadToProject(lead.id, selectedType);
@@ -65,6 +77,7 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
   };
 
   const handleDelete = async () => {
+    if (!lead) return;
     setDeleting(true);
     try {
       await deleteLead(lead.id);
@@ -78,10 +91,12 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
   };
 
   const handleStageChange = async (stage: string) => {
+    if (!lead) return;
     await moveLeadStage(lead.id, stage as FunnelStage);
   };
 
   const handleFieldSave = async (field: string, value: string) => {
+    if (!lead) return;
     const updates: Partial<Lead> = {};
     if (field === 'name') updates.name = value;
     if (field === 'contact') updates.contact = value;
@@ -107,441 +122,528 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
   };
 
   const handleArraySave = async (field: 'emails' | 'phones', items: string[]) => {
+    if (!lead) return;
     await updateLead(lead.id, { [field]: items });
   };
 
-  const formattedValue = lead.estimatedValue
+  const handleCreateTask = async () => {
+    if (!lead) return;
+    if (!newTaskTitle.trim()) return;
+    await createTask({
+      title: newTaskTitle.trim(),
+      type: 'sales',
+      status: 'todo',
+      priority: 'medium',
+      ownerId: lead.ownerId || users[0]?.id || '',
+      tags: [],
+      leadId: lead.id,
+    });
+    setNewTaskTitle('');
+    setAddingTask(false);
+  };
+
+  const formattedValue = lead?.estimatedValue
     ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.estimatedValue)
-    : 'Sem valor';
+    : '';
 
-  // Merge legacy phone field with phones array for display
-  const allPhones = lead.phone
+  const allPhones = lead?.phone
     ? [lead.phone, ...(lead.phones || []).filter(p => p !== lead.phone)]
-    : (lead.phones || []);
+    : (lead?.phones || []);
 
-  return createPortal(
-    <AnimatePresence>
+
+  return (
+    <AnimatePresence mode="wait">
       {lead && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            className="fixed inset-0 bg-black/60 z-[99]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-
-          {/* Modal */}
-          <motion.div
-            className="fixed inset-0 z-[100] flex items-start justify-center pt-[6vh] px-4 pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white dark:bg-zinc-900 w-full max-w-[900px] max-h-[82vh] rounded-xl overflow-hidden flex flex-col pointer-events-auto shadow-2xl"
-              initial={{ y: 40, scale: 0.96 }}
-              animate={{ y: 0, scale: 1 }}
-              exit={{ y: 40, scale: 0.96 }}
-              transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* ═══ Header ═══ */}
-              <div className="px-6 pt-5 pb-4 border-b border-zinc-100 dark:border-zinc-800">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge color={stageColor}>{stageLabel}</Badge>
-                    {hasProject && <Badge variant="done">Projeto vinculado</Badge>}
-                  </div>
-                  <button
-                    onClick={onClose}
-                    className="p-1.5 -mr-1.5 -mt-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+        <motion.aside
+          key={lead.id}
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: 420, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+          className="flex-shrink-0 rounded-xl border border-zinc-200/60 dark:border-zinc-700/40 bg-white dark:bg-zinc-900 overflow-hidden"
+          style={{ height: '100%' }}
+        >
+          <div className="w-[420px] h-full flex flex-col overflow-y-auto">
+            {/* ═══ Header ═══ */}
+            <div className="px-5 pt-4 pb-3">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge color={stageColor}>{stageLabel}</Badge>
+                  {hasProject && <Badge variant="done">Projeto vinculado</Badge>}
                 </div>
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-                {/* Logo + Company Info */}
-                <div className="flex items-start gap-4">
-                  <LogoSection
-                    name={lead.name}
-                    logoUrl={lead.logoUrl}
-                    editable={editable}
-                    onSave={(url) => handleFieldSave('logoUrl', url)}
+              {/* Logo + Name */}
+              <div className="flex items-start gap-3">
+                <LogoSection
+                  name={lead.name}
+                  logoUrl={lead.logoUrl}
+                  editable={editable}
+                  onSave={(url) => handleFieldSave('logoUrl', url)}
+                />
+                <div className="flex-1 min-w-0">
+                  <EditableText
+                    value={lead.name}
+                    onSave={(v) => handleFieldSave('name', v)}
+                    className="text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-tight"
+                    readOnly={!editable}
                   />
-                  <div className="flex-1 min-w-0">
-                    <EditableText
-                      value={lead.name}
-                      onSave={(v) => handleFieldSave('name', v)}
-                      className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight"
-                      readOnly={!editable}
-                    />
+                  {(lead.razaoSocial || editable) && (
                     <EditableText
                       value={lead.razaoSocial || ''}
                       onSave={(v) => handleFieldSave('razaoSocial', v)}
-                      className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5"
+                      className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"
                       placeholder="Razão social..."
                       readOnly={!editable}
-                      icon={<Building2 className="w-3 h-3 text-zinc-400 mr-1 flex-shrink-0" />}
                     />
+                  )}
+                  {lead.website && (
                     <div className="flex items-center gap-1 mt-1">
-                      {lead.website ? (
-                        <div className="flex items-center gap-1 group">
-                          <Globe className="w-3 h-3 text-zinc-400" />
-                          <EditableText
-                            value={lead.website}
-                            onSave={(v) => handleFieldSave('website', v)}
-                            className="text-xs text-blue-500 dark:text-blue-400 hover:underline"
-                            readOnly={!editable}
-                          />
-                          <a
-                            href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-0.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-blue-500 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      ) : editable ? (
-                        <EditableText
-                          value=""
-                          onSave={(v) => handleFieldSave('website', v)}
-                          className="text-xs text-zinc-400"
-                          placeholder="Adicionar website..."
-                          readOnly={false}
-                          icon={<Globe className="w-3 h-3 text-zinc-400 mr-1 flex-shrink-0" />}
-                        />
-                      ) : null}
+                      <Globe className="w-3 h-3 text-zinc-400" />
+                      <a
+                        href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-blue-500 dark:text-blue-400 hover:underline truncate"
+                      >
+                        {lead.website}
+                      </a>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* ═══ Body — Two columns ═══ */}
-              <div className="flex flex-1 overflow-hidden">
+            {/* ═══ Scrollable Body ═══ */}
+            <div className="flex-1 px-5 pb-5 space-y-3 overflow-y-auto">
 
-                {/* ── Left: Main content ── */}
-                <div className="flex-1 p-6 space-y-5 overflow-y-auto">
+              {/* ─── Contatos ─── */}
+              <Section title="Contatos" icon={<User className="w-3.5 h-3.5" />}>
+                <div className="space-y-1.5">
+                  <InfoRow icon={<User className="w-3 h-3" />}>
+                    <EditableText
+                      value={lead.contact}
+                      onSave={(v) => handleFieldSave('contact', v)}
+                      className="text-xs text-zinc-700 dark:text-zinc-300"
+                      placeholder="Nome do contato..."
+                      readOnly={!editable}
+                    />
+                  </InfoRow>
 
-                  {/* ─── Dados da Empresa ─── */}
-                  <div>
-                    <SectionHeader icon={<Building2 className="w-3.5 h-3.5" />} label="Dados da Empresa" />
-                    <div className="grid grid-cols-2 gap-3 mt-2">
-                      <FieldCard
-                        icon={<FileText className="w-3.5 h-3.5" />}
-                        label="CNPJ"
-                        value={lead.cnpj ? formatCnpj(lead.cnpj) : ''}
-                        editable={editable}
-                        onSave={(v) => handleFieldSave('cnpj', stripCnpj(v))}
-                      />
-                      <FieldCard
-                        icon={<MapPin className="w-3.5 h-3.5" />}
-                        label="Endereço"
-                        value={lead.endereco || ''}
-                        editable={editable}
-                        onSave={(v) => handleFieldSave('endereco', v)}
-                      />
-                    </div>
-                  </div>
+                  {/* Emails */}
+                  <MultiFieldCompact
+                    icon={<Mail className="w-3 h-3" />}
+                    label="Emails"
+                    items={lead.emails || []}
+                    onUpdate={(items) => handleArraySave('emails', items)}
+                    placeholder="email@empresa.com"
+                    type="email"
+                    editable={editable}
+                  />
 
-                  {/* ─── Contatos ─── */}
-                  <div>
-                    <SectionHeader icon={<User className="w-3.5 h-3.5" />} label="Contatos" />
-                    <div className="mt-2 space-y-3">
-                      {/* Contact name (legacy field) */}
-                      <div className="flex items-center gap-2 px-2">
-                        <User className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
-                        <EditableText
-                          value={lead.contact}
-                          onSave={(v) => handleFieldSave('contact', v)}
-                          className="text-sm text-zinc-700 dark:text-zinc-300"
-                          placeholder="Nome do contato..."
-                          readOnly={!editable}
-                        />
-                      </div>
+                  {/* Phones */}
+                  <MultiFieldCompact
+                    icon={<Phone className="w-3 h-3" />}
+                    label="Telefones"
+                    items={allPhones}
+                    onUpdate={(items) => {
+                      const [first, ...rest] = items;
+                      handleFieldSave('phone', first || '');
+                      handleArraySave('phones', rest);
+                    }}
+                    placeholder="(11) 99999-0000"
+                    type="tel"
+                    editable={editable}
+                    renderAction={(item) => (
+                      <a
+                        href={`https://wa.me/55${item.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-0.5 rounded hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors"
+                        title="WhatsApp"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <WhatsAppIcon className="w-3 h-3" />
+                      </a>
+                    )}
+                  />
+                </div>
+              </Section>
 
-                      {/* Emails */}
-                      <MultiField
-                        icon={<Mail className="w-3.5 h-3.5" />}
-                        label="Emails"
-                        items={lead.emails || []}
-                        onUpdate={(items) => handleArraySave('emails', items)}
-                        placeholder="email@empresa.com"
-                        type="email"
-                        editable={editable}
-                      />
-
-                      {/* Phones */}
-                      <MultiField
-                        icon={<Phone className="w-3.5 h-3.5" />}
-                        label="Telefones"
-                        items={allPhones}
-                        onUpdate={(items) => {
-                          // First phone stays in legacy 'phone' field, rest in phones[]
-                          const [first, ...rest] = items;
-                          handleFieldSave('phone', first || '');
-                          handleArraySave('phones', rest);
-                        }}
-                        placeholder="(11) 99999-0000"
-                        type="tel"
-                        editable={editable}
-                        renderAction={(item) => (
-                          <a
-                            href={`https://wa.me/55${item.replace(/\D/g, '')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center justify-center w-6 h-6 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 transition-colors"
-                            title="Abrir no WhatsApp"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <WhatsAppIcon className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  {/* ─── Informações ─── */}
-                  <div>
-                    <SectionHeader icon={<Tag className="w-3.5 h-3.5" />} label="Informações" />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
-                      {/* Stage selector */}
-                      <SelectFieldCard
-                        icon={<ChevronDown className="w-3.5 h-3.5" />}
-                        label="Etapa"
-                        value={lead.stage}
-                        displayValue={stageLabel}
-                        options={funnelColumns.map(c => ({ id: c.id, label: c.label, color: c.color }))}
-                        onSave={handleStageChange}
-                        showDot
-                      />
-                      <FieldCard
-                        icon={<DollarSign className="w-3.5 h-3.5" />}
-                        label="Valor"
-                        value={formattedValue}
-                        editable={editable}
-                        onSave={(v) => handleFieldSave('estimatedValue', v)}
-                      />
-                      {/* Origin selector */}
-                      <SelectFieldCard
-                        icon={<Tag className="w-3.5 h-3.5" />}
-                        label="Origem"
-                        value={lead.origin || ''}
-                        displayValue={lead.origin || '—'}
-                        options={LEAD_ORIGINS.map(o => ({ id: o, label: o }))}
-                        onSave={(v) => handleFieldSave('origin', v)}
-                      />
-                      <OwnerFieldCard
-                        ownerId={lead.ownerId}
-                        users={users}
-                        getUserById={getUserById}
-                        onSave={(id) => handleFieldSave('ownerId', id)}
-                      />
-                      {/* Next contact date */}
-                      <DateFieldCard
-                        icon={<Calendar className="w-3.5 h-3.5" />}
-                        label="Próx. contato"
-                        value={lead.nextContactDate || ''}
-                        alert={!!isOverdue}
-                        editable={editable}
-                        onSave={(v) => handleFieldSave('nextContactDate', v)}
-                      />
-                      <BillingFieldCard
-                        billingType={lead.billingType}
-                        billingCycle={lead.billingCycle}
-                        onSaveBillingType={(v) => handleFieldSave('billingType', v)}
-                        onSaveBillingCycle={(v) => handleFieldSave('billingCycle', v)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Solution type — always visible */}
-                  <div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 block mb-1">Tipo de solução</span>
+              {/* ─── Detalhes do Negócio ─── */}
+              <Section title="Detalhes" icon={<Tag className="w-3.5 h-3.5" />}>
+                <div className="space-y-0">
+                  <DetailRow label="Etapa">
+                    <StageSelector
+                      value={lead.stage}
+                      columns={funnelColumns}
+                      onChange={handleStageChange}
+                    />
+                  </DetailRow>
+                  <DetailRow label="Valor">
+                    <EditableText
+                      value={formattedValue}
+                      onSave={(v) => handleFieldSave('estimatedValue', v)}
+                      className="text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                      placeholder="R$ 0,00"
+                      readOnly={!editable}
+                    />
+                  </DetailRow>
+                  <DetailRow label="Origem">
+                    <OriginSelector value={lead.origin || ''} onSave={(v) => handleFieldSave('origin', v)} />
+                  </DetailRow>
+                  <DetailRow label="Responsável">
+                    <OwnerSelector
+                      ownerId={lead.ownerId}
+                      users={users}
+                      getUserById={getUserById}
+                      onSave={(id) => handleFieldSave('ownerId', id)}
+                    />
+                  </DetailRow>
+                  <DetailRow label="Próx. contato">
+                    <DateInput
+                      value={lead.nextContactDate || ''}
+                      onSave={(v) => handleFieldSave('nextContactDate', v)}
+                      alert={!!isOverdue}
+                    />
+                  </DetailRow>
+                  <DetailRow label="Cobrança">
+                    <BillingSelector
+                      billingType={lead.billingType}
+                      billingCycle={lead.billingCycle}
+                      onSaveType={(v) => handleFieldSave('billingType', v)}
+                      onSaveCycle={(v) => handleFieldSave('billingCycle', v)}
+                    />
+                  </DetailRow>
+                  <DetailRow label="Solução">
                     <EditableText
                       value={lead.solutionType || ''}
                       onSave={(v) => handleFieldSave('solutionType', v)}
-                      className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
-                      placeholder="Ex: SaaS, App mobile, Dashboard..."
+                      className="text-xs text-zinc-700 dark:text-zinc-300"
+                      placeholder="SaaS, App, Dashboard..."
                       readOnly={!editable}
                     />
-                  </div>
+                  </DetailRow>
+                  <DetailRow label="CNPJ">
+                    <EditableText
+                      value={lead.cnpj ? formatCnpj(lead.cnpj) : ''}
+                      onSave={(v) => handleFieldSave('cnpj', stripCnpj(v))}
+                      className="text-xs text-zinc-700 dark:text-zinc-300"
+                      placeholder="00.000.000/0001-00"
+                      readOnly={!editable}
+                    />
+                  </DetailRow>
+                  <DetailRow label="Endereço">
+                    <EditableText
+                      value={lead.endereco || ''}
+                      onSave={(v) => handleFieldSave('endereco', v)}
+                      className="text-xs text-zinc-700 dark:text-zinc-300"
+                      placeholder="Endereço..."
+                      readOnly={!editable}
+                    />
+                  </DetailRow>
+                </div>
+              </Section>
 
-                  {/* Description / Notes */}
-                  <div>
-                    <SectionHeader icon={<Edit3 className="w-3.5 h-3.5" />} label="Observações" />
-                    <div className="mt-2">
-                      <EditableTextArea
-                        value={lead.notes || ''}
-                        placeholder="Adicione uma descrição mais detalhada..."
-                        onSave={(v) => handleFieldSave('notes', v)}
-                        readOnly={!editable}
+              {/* ─── Tarefas Vinculadas ─── */}
+              <Section title="Tarefas" icon={<ListTodo className="w-3.5 h-3.5" />} count={linkedTasks.length}
+                action={
+                  <button
+                    onClick={() => { setAddingTask(true); setTimeout(() => taskInputRef.current?.focus(), 50); }}
+                    className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer"
+                    title="Adicionar tarefa"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                }
+              >
+                <div className="space-y-1">
+                  {addingTask && (
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white dark:bg-zinc-800 border border-primary/30">
+                      <input
+                        ref={taskInputRef}
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleCreateTask();
+                          if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); }
+                        }}
+                        onBlur={() => { if (!newTaskTitle.trim()) { setAddingTask(false); setNewTaskTitle(''); } }}
+                        className="flex-1 text-xs bg-transparent outline-none text-zinc-700 dark:text-zinc-300"
+                        placeholder="Título da tarefa..."
                       />
-                    </div>
-                  </div>
-
-                  {/* Loss Reason — editable */}
-                  {(lead.lossReason || lead.stage === 'lost') && (
-                    <div className="rounded-lg p-3 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/30">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-red-500 block mb-1">Motivo da Perda</span>
-                      <EditableText
-                        value={lead.lossReason || ''}
-                        onSave={(v) => handleFieldSave('lossReason', v)}
-                        className="text-sm text-zinc-700 dark:text-zinc-300"
-                        placeholder="Descreva o motivo da perda..."
-                        readOnly={!editable}
-                      />
+                      <button onClick={handleCreateTask} className="text-primary hover:text-primary/80 cursor-pointer">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   )}
-
-                  {/* ─── Delete Lead ─── */}
-                  {canDeleteLead && (
-                    <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                      {!confirmDelete ? (
-                        <button
-                          onClick={() => setConfirmDelete(true)}
-                          className="flex items-center gap-2 text-xs text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer py-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Excluir lead
-                        </button>
-                      ) : (
-                        <div className="rounded-lg p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-red-500" />
-                            <span className="text-xs font-semibold text-red-600 dark:text-red-400">Excluir permanentemente?</span>
-                          </div>
-                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                            Esta ação não pode ser desfeita. Todas as interações vinculadas também serão removidas.
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setConfirmDelete(false)}
-                              className="flex-1 px-3 py-1.5 text-xs font-medium rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                            >
-                              Cancelar
-                            </button>
-                            <button
-                              onClick={handleDelete}
-                              disabled={deleting}
-                              className="flex-1 px-3 py-1.5 text-xs font-medium rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              {deleting ? 'Excluindo...' : 'Sim, excluir'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Convert to Project — only admin/gestor can convert */}
-                  {canConvert && canEditAll && (
-                    <div className="rounded-lg p-4 space-y-3 bg-violet-50 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/30">
-                      <div className="flex items-center gap-2">
-                        <Briefcase className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                        <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Converter em Projeto</h3>
+                  {linkedTasks.length > 0 ? linkedTasks.map(task => {
+                    const statusColors: Record<string, string> = {
+                      todo: 'bg-zinc-300 dark:bg-zinc-600',
+                      in_progress: 'bg-blue-500',
+                      done: 'bg-emerald-500',
+                      blocked: 'bg-red-500',
+                    };
+                    return (
+                      <div key={task.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white dark:hover:bg-zinc-800 transition-colors group">
+                        <div className={cn('w-2 h-2 rounded-full flex-shrink-0', statusColors[task.status] || 'bg-zinc-300')} />
+                        <span className={cn('text-xs flex-1 truncate', task.status === 'done' ? 'line-through text-zinc-400' : 'text-zinc-700 dark:text-zinc-300')}>
+                          {task.title}
+                        </span>
+                        {task.dueDate && (
+                          <span className={cn('text-[9px]', new Date(task.dueDate) < new Date() && task.status !== 'done' ? 'text-red-500' : 'text-zinc-400')}>
+                            {new Date(task.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setSelectedType('recurring')}
-                          className={cn(
-                            'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all border cursor-pointer',
-                            selectedType === 'recurring'
-                              ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                              : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800',
-                          )}
-                        >Recorrente</button>
-                        <button
-                          onClick={() => setSelectedType('oneshot')}
-                          className={cn(
-                            'flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all border cursor-pointer',
-                            selectedType === 'oneshot'
-                              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
-                              : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800',
-                          )}
-                        >Único</button>
-                      </div>
-                      <Button size="sm" onClick={handleConvert} disabled={converting} className="w-full">
-                        {converting ? 'Convertendo...' : 'Criar Projeto'}
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    );
+                  }) : !addingTask && (
+                    <p className="text-[11px] text-zinc-400 px-2 py-2">Nenhuma tarefa vinculada.</p>
                   )}
+                </div>
+              </Section>
 
-                  {/* Linked project */}
-                  {hasProject && (
-                    <div className="rounded-lg p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 flex items-center gap-3">
+              {/* ─── Projeto Vinculado ─── */}
+              {linkedProject && (
+                <Section title="Projeto" icon={<Briefcase className="w-3.5 h-3.5" />}>
+                  <button
+                    onClick={() => { onClose(); setLocation('/projects'); }}
+                    className="w-full flex items-center gap-3 px-2 py-2 rounded-md hover:bg-white dark:hover:bg-zinc-800 transition-colors group cursor-pointer"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
                       <Briefcase className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      <div>
-                        <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Projeto criado deste lead</p>
-                        <button onClick={() => { onClose(); setLocation('/projects'); }} className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline cursor-pointer">
-                          Ver em Projetos →
-                        </button>
-                      </div>
                     </div>
-                  )}
-                </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{linkedProject.clientName}</p>
+                      <p className="text-[10px] text-zinc-400">{linkedProject.type === 'recurring' ? 'Recorrente' : 'Único'} · {linkedProject.status === 'active' ? 'Ativo' : linkedProject.status === 'paused' ? 'Pausado' : 'Concluído'}</p>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors" />
+                  </button>
+                </Section>
+              )}
 
-                {/* ── Right: Activity sidebar ── */}
-                <div className="w-[280px] flex-shrink-0 border-l border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 p-4 space-y-4 overflow-y-auto">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-zinc-400" />
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Atividade</h3>
-                    <span className="text-[10px] text-zinc-400 ml-auto bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded-full font-medium">
-                      {lead.interactions.length}
-                    </span>
+              {/* ─── Convert to Project ─── */}
+              {canConvert && (
+                <Section title="Converter" icon={<ArrowRight className="w-3.5 h-3.5" />}>
+                  <div className="space-y-2">
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => setSelectedType('recurring')}
+                        className={cn(
+                          'flex-1 px-2 py-1.5 rounded-md text-[10px] font-semibold transition-all border cursor-pointer',
+                          selectedType === 'recurring'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                            : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800',
+                        )}
+                      >Recorrente</button>
+                      <button
+                        onClick={() => setSelectedType('oneshot')}
+                        className={cn(
+                          'flex-1 px-2 py-1.5 rounded-md text-[10px] font-semibold transition-all border cursor-pointer',
+                          selectedType === 'oneshot'
+                            ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
+                            : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800',
+                        )}
+                      >Único</button>
+                    </div>
+                    <Button size="sm" onClick={handleConvert} disabled={converting} className="w-full">
+                      {converting ? 'Convertendo...' : 'Criar Projeto'}
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
+                </Section>
+              )}
 
-                  {lead.interactions.length > 0 ? (
-                    <div className="space-y-3">
-                      {[...lead.interactions].reverse().map((interaction) => {
-                        const Icon = interactionIcons[interaction.type] || MessageSquare;
-                        const user = getUserById(interaction.userId);
-                        return (
-                          <div key={interaction.id} className="flex gap-2.5">
-                            <div className="flex-shrink-0 w-7 h-7 rounded-md bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mt-0.5">
-                              <Icon className="w-3 h-3 text-violet-600 dark:text-violet-400" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 mb-0.5">
-                                <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-                                  {interactionLabels[interaction.type]}
-                                </span>
-                                <span className="text-[9px] text-zinc-400">
-                                  {new Date(interaction.date).toLocaleDateString('pt-BR')}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                                {interaction.content}
-                              </p>
-                              {user && (
-                                <span className="text-[9px] text-zinc-400/70 mt-0.5 block">
-                                  por {user.name}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-zinc-400 text-center py-6">Nenhuma atividade.</p>
-                  )}
+              {/* ─── Observações ─── */}
+              <Section title="Observações" icon={<Edit3 className="w-3.5 h-3.5" />}>
+                <EditableTextArea
+                  value={lead.notes || ''}
+                  placeholder="Adicione observações..."
+                  onSave={(v) => handleFieldSave('notes', v)}
+                  readOnly={!editable}
+                />
+              </Section>
+
+              {/* ─── Loss Reason ─── */}
+              {(lead.lossReason || lead.stage === 'lost') && (
+                <div className="rounded-lg p-3 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/30">
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-red-500 block mb-1">Motivo da Perda</span>
+                  <EditableText
+                    value={lead.lossReason || ''}
+                    onSave={(v) => handleFieldSave('lossReason', v)}
+                    className="text-xs text-zinc-700 dark:text-zinc-300"
+                    placeholder="Descreva..."
+                    readOnly={!editable}
+                  />
                 </div>
+              )}
+
+              {/* ─── Activity Feed (collapsible) ─── */}
+              <div className="rounded-lg border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+                <button
+                  onClick={() => setShowActivity(!showActivity)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 flex-1">Atividade</span>
+                  <span className="text-[10px] text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full font-medium">
+                    {lead.interactions.length}
+                  </span>
+                  <ChevronDown className={cn('w-3.5 h-3.5 text-zinc-400 transition-transform', showActivity && 'rotate-180')} />
+                </button>
+
+                <AnimatePresence>
+                  {showActivity && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-3 pb-3 space-y-2.5 border-t border-zinc-100 dark:border-zinc-800 pt-2.5">
+                        {lead.interactions.length > 0 ? (
+                          [...lead.interactions].reverse().map((interaction) => {
+                            const Icon = interactionIcons[interaction.type] || MessageSquare;
+                            const user = getUserById(interaction.userId);
+                            return (
+                              <div key={interaction.id} className="flex gap-2">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center mt-0.5">
+                                  <Icon className="w-3 h-3 text-primary" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300">
+                                      {interactionLabels[interaction.type]}
+                                    </span>
+                                    <span className="text-[9px] text-zinc-400">
+                                      {new Date(interaction.date).toLocaleDateString('pt-BR')}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                    {interaction.content}
+                                  </p>
+                                  {user && (
+                                    <span className="text-[9px] text-zinc-400/70">por {user.name}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-[10px] text-zinc-400 text-center py-3">Nenhuma atividade.</p>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-            </motion.div>
-          </motion.div>
-        </>
+
+              {/* ─── Footer: Delete ─── */}
+              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                {!confirmDelete ? (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-1.5 text-[10px] text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer py-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Excluir lead
+                  </button>
+                ) : (
+                  <div className="rounded-lg p-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                      <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">Excluir permanentemente?</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setConfirmDelete(false)}
+                        className="flex-1 px-2 py-1 text-[10px] font-medium rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="flex-1 px-2 py-1 text-[10px] font-medium rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {deleting ? 'Excluindo...' : 'Sim, excluir'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Meta info */}
+              <div className="text-[9px] text-zinc-400/60 pt-1 space-y-0.5">
+                <p>Criado em {new Date(lead.createdAt).toLocaleDateString('pt-BR')}</p>
+                <p>Atualizado em {new Date(lead.updatedAt).toLocaleDateString('pt-BR')}</p>
+              </div>
+            </div>
+          </div>
+        </motion.aside>
       )}
-    </AnimatePresence>,
-    document.body
+    </AnimatePresence>
   );
 }
 
-/* ═══ Logo Section ═══ */
+
+/* ═══════════════════════════════════════════════
+   SUB-COMPONENTS
+   ═══════════════════════════════════════════════ */
+
+/* ─── Section Container (GitLab-style) ─── */
+function Section({ title, icon, children, count, action }: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  count?: number;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-100 dark:border-zinc-800">
+        <span className="text-zinc-400">{icon}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex-1">{title}</span>
+        {count !== undefined && count > 0 && (
+          <span className="text-[9px] text-zinc-400 bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded-full font-medium">{count}</span>
+        )}
+        {action}
+      </div>
+      <div className="px-3 py-2">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Detail Row (label: value) ─── */
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center py-1.5 border-b border-zinc-100 dark:border-zinc-800/50 last:border-b-0">
+      <span className="text-[10px] text-zinc-400 w-[90px] flex-shrink-0">{label}</span>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
+}
+
+/* ─── Info Row (icon + content) ─── */
+function InfoRow({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 px-2 py-1">
+      <span className="text-zinc-400 flex-shrink-0">{icon}</span>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
+}
+
+/* ─── Logo Section (with upload) ─── */
 function LogoSection({ name, logoUrl, editable, onSave }: {
   name: string;
   logoUrl?: string;
@@ -549,657 +651,427 @@ function LogoSection({ name, logoUrl, editable, onSave }: {
   onSave: (url: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState<'upload' | 'url'>('upload');
   const [draft, setDraft] = useState(logoUrl || '');
   const [imgError, setImgError] = useState(false);
-  const ref = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const urlRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setDraft(logoUrl || ''); setImgError(false); }, [logoUrl]);
-  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  useEffect(() => { if (editing && tab === 'url') urlRef.current?.focus(); }, [editing, tab]);
+  useEffect(() => {
+    if (!editing) return;
+    const handleClick = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) setEditing(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [editing]);
 
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(w => w[0])
-    .join('')
-    .toUpperCase();
+  const initials = name.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-  const commit = () => {
+  const commitUrl = () => {
     setEditing(false);
     if (draft.trim() !== (logoUrl || '')) onSave(draft.trim());
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!file.type.startsWith('image/') || file.size > 2 * 1024 * 1024) return;
+    setUploading(true);
+    try {
+      const { supabase } = await import('@/shared/lib/supabase');
+      const ext = file.name.split('.').pop() || 'png';
+      const fileName = `lead-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('logos').upload(fileName, file, { cacheControl: '3600', upsert: false });
+      if (error) {
+        const reader = new FileReader();
+        reader.onload = (e) => { onSave(e.target?.result as string); setEditing(false); };
+        reader.readAsDataURL(file);
+        return;
+      }
+      const { data } = supabase.storage.from('logos').getPublicUrl(fileName);
+      if (data?.publicUrl) { onSave(data.publicUrl); setEditing(false); }
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => { onSave(e.target?.result as string); setEditing(false); };
+      reader.readAsDataURL(file);
+    } finally { setUploading(false); }
   };
 
   const showImage = logoUrl && !imgError;
 
   return (
-    <div className="relative flex-shrink-0">
+    <div className="relative flex-shrink-0" ref={popoverRef}>
       <div
         className={cn(
-          'w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden transition-all',
-          showImage
-            ? 'bg-white dark:bg-zinc-800'
-            : 'bg-primary/10 dark:bg-primary/20',
+          'w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden transition-all',
+          showImage ? 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700' : 'bg-primary/10 dark:bg-primary/20',
           editable && 'cursor-pointer group',
         )}
         onClick={() => editable && setEditing(true)}
-        title={editable ? 'Clique para alterar a logo' : undefined}
       >
         {showImage ? (
-          <img
-            src={logoUrl}
-            alt={name}
-            className="w-full h-full object-contain p-1"
-            onError={() => setImgError(true)}
-          />
+          <img src={logoUrl} alt={name} className="w-full h-full object-contain p-0.5" onError={() => setImgError(true)} />
         ) : (
-          <span className="text-lg font-bold text-primary">{initials}</span>
+          <span className="text-sm font-bold text-primary">{initials}</span>
         )}
         {editable && (
-          <div className="absolute inset-0 rounded-xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <ImageIcon className="w-4 h-4 text-white" />
+          <div className="absolute inset-0 rounded-lg bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <ImageIcon className="w-3 h-3 text-white" />
           </div>
         )}
       </div>
 
-      {/* URL input popover */}
       {editing && (
-        <div className="absolute top-full left-0 mt-2 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl p-3 w-64">
-          <label className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 block mb-1">URL da Logo</label>
-          <input
-            ref={ref}
-            type="url"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(logoUrl || ''); setEditing(false); } }}
-            className="w-full text-xs px-2 py-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-1 focus:ring-primary/30 text-zinc-700 dark:text-zinc-300"
-            placeholder="https://example.com/logo.png"
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ═══ Section Header ═══ */
-function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <div className="flex items-center gap-2 pb-1 border-b border-zinc-100 dark:border-zinc-800">
-      <span className="text-zinc-400">{icon}</span>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">{label}</span>
-    </div>
-  );
-}
-
-/* ═══ Multi Field (emails / phones) ═══ */
-function MultiField({ icon, label, items, onUpdate, placeholder, type, editable, renderAction }: {
-  icon: React.ReactNode;
-  label: string;
-  items: string[];
-  onUpdate: (items: string[]) => void;
-  placeholder: string;
-  type?: 'email' | 'tel' | 'text';
-  editable: boolean;
-  renderAction?: (item: string, index: number) => React.ReactNode;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { if (adding) inputRef.current?.focus(); }, [adding]);
-
-  const handleAdd = () => {
-    if (draft.trim()) {
-      onUpdate([...items, draft.trim()]);
-      setDraft('');
-      setAdding(false);
-    }
-  };
-
-  const handleRemove = (index: number) => {
-    onUpdate(items.filter((_, i) => i !== index));
-  };
-
-  return (
-    <div className="rounded-lg border border-zinc-100 dark:border-zinc-800 p-2.5">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <span className="text-zinc-400">{icon}</span>
-        <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{label}</span>
-        <span className="text-[9px] text-zinc-400 ml-auto bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full font-medium">{items.length}</span>
-      </div>
-
-      {/* Existing items */}
-      {items.length > 0 && (
-        <div className="space-y-0.5">
-          {items.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800/50 group transition-colors">
-              <span className="text-sm text-zinc-700 dark:text-zinc-300 flex-1 min-w-0 truncate">{item}</span>
-              {renderAction?.(item, idx)}
-              {editable && (
-                <button
-                  onClick={() => handleRemove(idx)}
-                  className="flex-shrink-0 p-0.5 rounded text-zinc-300 dark:text-zinc-600 opacity-0 group-hover:opacity-100 hover:text-red-500 dark:hover:text-red-400 transition-all cursor-pointer"
-                  title="Remover"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Add new */}
-      {editable && (
-        adding ? (
-          <div className="flex items-center gap-2 mt-1 px-2">
-            <input
-              ref={inputRef}
-              type={type || 'text'}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => { if (!draft.trim()) setAdding(false); else handleAdd(); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') { setDraft(''); setAdding(false); } }}
-              className="flex-1 text-sm bg-transparent border-b border-primary/40 outline-none py-1 text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-400"
-              placeholder={placeholder}
-            />
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl w-64 overflow-hidden">
+          <div className="flex border-b border-zinc-100 dark:border-zinc-800">
+            {(['upload', 'url'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)} className={cn(
+                'flex-1 px-2 py-1.5 text-[9px] font-semibold uppercase tracking-wider transition-colors cursor-pointer',
+                tab === t ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-zinc-400 hover:text-zinc-600',
+              )}>{t === 'upload' ? 'Upload' : 'URL'}</button>
+            ))}
           </div>
-        ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 mt-1 px-2 py-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer"
-          >
-            <Plus className="w-3 h-3" />
-            Adicionar
-          </button>
-        )
+          <div className="p-2.5">
+            {tab === 'upload' ? (
+              <>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+                <button onClick={() => fileRef.current?.click()} disabled={uploading} className="w-full border-2 border-dashed rounded-lg py-3 flex flex-col items-center gap-1 border-zinc-200 dark:border-zinc-700 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer">
+                  {uploading ? (
+                    <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <ImageIcon className="w-4 h-4 text-zinc-400" />
+                      <span className="text-[10px] text-zinc-500">Clique ou arraste</span>
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <input
+                ref={urlRef} type="url" value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={commitUrl}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitUrl(); if (e.key === 'Escape') { setDraft(logoUrl || ''); setEditing(false); } }}
+                className="w-full text-xs px-2 py-1.5 rounded-md bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 outline-none focus:ring-1 focus:ring-primary/30 text-zinc-700 dark:text-zinc-300"
+                placeholder="https://..."
+              />
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-/* ═══ CNPJ Format Helpers ═══ */
-function formatCnpj(value: string): string {
-  const digits = value.replace(/\D/g, '');
-  if (digits.length !== 14) return value;
-  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-}
 
-function stripCnpj(value: string): string {
-  return value.replace(/\D/g, '');
-}
-
-/* ═══ Inline Editable Text ═══ */
+/* ─── Editable Text ─── */
 function EditableText({ value, onSave, className, placeholder, readOnly, icon }: {
-  value: string;
-  onSave: (value: string) => void;
-  className?: string;
-  placeholder?: string;
-  readOnly?: boolean;
-  icon?: React.ReactNode;
+  value: string; onSave: (v: string) => void; className?: string; placeholder?: string; readOnly?: boolean; icon?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
-
   useEffect(() => { setDraft(value); }, [value]);
-  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  useEffect(() => { if (editing) { ref.current?.focus(); ref.current?.select(); } }, [editing]);
+  const commit = () => { setEditing(false); if (draft.trim() !== value && onSave) onSave(draft.trim()); };
 
-  const commit = () => {
-    setEditing(false);
-    if (draft.trim() !== value) onSave(draft.trim());
-  };
-
-  if (readOnly) {
+  if (readOnly || !editing) {
     return (
-      <div className="flex items-center">
+      <div className={cn('flex items-center gap-1 group', !readOnly && 'cursor-pointer')} onClick={() => !readOnly && setEditing(true)}>
         {icon}
-        <p className={className}>{value || <span className="text-zinc-400 italic">{placeholder || '—'}</span>}</p>
+        <span className={cn(className, !value && 'text-zinc-400 italic')}>
+          {value || placeholder || '—'}
+        </span>
       </div>
     );
   }
-
-  if (editing) {
-    return (
-      <div className="flex items-center">
-        {icon}
-        <input
-          ref={ref}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
-          className={cn(className, 'bg-transparent outline-none border-b-2 border-violet-400 w-full')}
-          placeholder={placeholder}
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex items-center">
-      {icon}
-      <p
-        onClick={() => setEditing(true)}
-        className={cn(className, 'cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded px-1 -mx-1 transition-colors')}
-        title="Clique para editar"
-      >
-        {value || <span className="text-zinc-400 italic">{placeholder || 'Clique para editar'}</span>}
-      </p>
-    </div>
+    <input
+      ref={ref} value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
+      className={cn(className, 'bg-transparent outline-none border-b border-primary/40 w-full')}
+      placeholder={placeholder}
+    />
   );
 }
 
-/* ═══ Inline Editable TextArea ═══ */
+/* ─── Editable TextArea ─── */
 function EditableTextArea({ value, onSave, placeholder, readOnly }: {
-  value: string;
-  onSave: (value: string) => void;
-  placeholder?: string;
-  readOnly?: boolean;
+  value: string; onSave: (v: string) => void; placeholder?: string; readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => { setDraft(value); }, [value]);
-  useEffect(() => { if (editing && ref.current) { ref.current.focus(); ref.current.style.height = 'auto'; ref.current.style.height = ref.current.scrollHeight + 'px'; } }, [editing]);
-
-  const commit = () => {
-    setEditing(false);
-    if (draft.trim() !== value) onSave(draft.trim());
-  };
-
-  if (readOnly) {
-    return (
-      <div className="text-sm leading-relaxed rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800/50 border border-transparent min-h-[80px]">
-        {value ? <p className="text-zinc-700 dark:text-zinc-300">{value}</p> : <p className="text-zinc-400 italic">{placeholder || '—'}</p>}
-      </div>
-    );
-  }
-
-  if (editing) {
-    return (
-      <textarea
-        ref={ref}
-        value={draft}
-        onChange={(e) => { setDraft(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
-        className="w-full text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed bg-white dark:bg-zinc-800 border border-violet-300 dark:border-violet-600 rounded-lg p-3 outline-none resize-none min-h-[80px]"
-        placeholder={placeholder}
-      />
-    );
-  }
-
-  return (
-    <div
-      onClick={() => setEditing(true)}
-      className="text-sm leading-relaxed rounded-lg p-3 cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 min-h-[80px]"
-      title="Clique para editar"
-    >
-      {value ? (
-        <p className="text-zinc-700 dark:text-zinc-300">{value}</p>
-      ) : (
-        <p className="text-zinc-400 italic">{placeholder || 'Clique para adicionar...'}</p>
-      )}
-    </div>
-  );
-}
-
-/* ═══ Field Card ═══ */
-function FieldCard({ icon, label, value, alert, editable, onSave, action }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  alert?: boolean;
-  editable?: boolean;
-  onSave?: (value: string) => void;
-  action?: React.ReactNode;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const ref = useRef<HTMLInputElement>(null);
-
   useEffect(() => { setDraft(value); }, [value]);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  const commit = () => { setEditing(false); if (draft.trim() !== value) onSave(draft.trim()); };
 
-  const commit = () => {
-    setEditing(false);
-    if (draft.trim() !== value && onSave) onSave(draft.trim());
+  if (!editing || readOnly) {
+    return (
+      <div className={cn('text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap min-h-[40px]', !readOnly && 'cursor-pointer hover:bg-white dark:hover:bg-zinc-800 rounded p-1 -m-1 transition-colors')} onClick={() => !readOnly && setEditing(true)}>
+        {value || <span className="text-zinc-400 italic">{placeholder}</span>}
+      </div>
+    );
+  }
+  return (
+    <textarea
+      ref={ref} value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      rows={3}
+      className="w-full text-xs bg-transparent outline-none border border-primary/30 rounded-md p-2 text-zinc-700 dark:text-zinc-300 resize-none"
+      placeholder={placeholder}
+    />
+  );
+}
+
+/* ─── MultiField Compact ─── */
+function MultiFieldCompact({ icon, label, items, onUpdate, placeholder, type, editable, renderAction }: {
+  icon: React.ReactNode; label: string; items: string[]; onUpdate: (items: string[]) => void;
+  placeholder: string; type?: string; editable: boolean; renderAction?: (item: string) => React.ReactNode;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (adding) ref.current?.focus(); }, [adding]);
+
+  const commitAdd = () => {
+    if (draft.trim()) { onUpdate([...items, draft.trim()]); }
+    setDraft(''); setAdding(false);
   };
 
   return (
-    <div
-      className={cn(
-        'rounded-lg p-2.5 border transition-colors relative group',
-        alert
-          ? 'bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30'
-          : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800',
-        editable && !editing && 'hover:border-violet-200 dark:hover:border-violet-700 cursor-pointer',
-      )}
-      onClick={(e) => { if (editable && !editing) { e.preventDefault(); setEditing(true); } }}
-    >
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <span className={alert ? 'text-red-500' : 'text-zinc-400'}>{icon}</span>
-          <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{label}</span>
-        </div>
-        {action && (
-          <div onClick={(e) => e.stopPropagation()}>{action}</div>
+    <div className="px-2 py-1 space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="text-zinc-400 flex-shrink-0">{icon}</span>
+        <span className="text-[10px] text-zinc-400 flex-1">{label}</span>
+        {editable && (
+          <button onClick={() => setAdding(true)} className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 cursor-pointer">
+            <Plus className="w-3 h-3" />
+          </button>
         )}
       </div>
-      {editing ? (
-        <input
-          ref={ref}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
-          className="text-sm font-medium bg-transparent outline-none border-b border-violet-400 w-full text-zinc-800 dark:text-zinc-200"
-        />
-      ) : (
-        <p className={cn('text-sm font-medium truncate', alert ? 'text-red-600 dark:text-red-400' : 'text-zinc-800 dark:text-zinc-200')}>
-          {value || (editable ? <span className="text-zinc-400 font-normal italic">Adicionar...</span> : '—')}
-        </p>
+      {items.map((item, i) => (
+        <div key={i} className="flex items-center gap-2 pl-5 group">
+          <span className="text-xs text-zinc-700 dark:text-zinc-300 flex-1 truncate">{item}</span>
+          {renderAction?.(item)}
+          {editable && (
+            <button onClick={() => onUpdate(items.filter((_, j) => j !== i))} className="p-0.5 opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-all cursor-pointer">
+              <X className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
+      ))}
+      {adding && (
+        <div className="flex items-center gap-2 pl-5">
+          <input
+            ref={ref} value={draft} type={type}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitAdd}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitAdd(); if (e.key === 'Escape') { setDraft(''); setAdding(false); } }}
+            className="flex-1 text-xs bg-transparent outline-none border-b border-primary/30 text-zinc-700 dark:text-zinc-300 py-0.5"
+            placeholder={placeholder}
+          />
+        </div>
+      )}
+      {items.length === 0 && !adding && (
+        <p className="text-[10px] text-zinc-400 pl-5 italic">{editable ? 'Clique + para adicionar' : 'Nenhum'}</p>
       )}
     </div>
   );
 }
 
-/* ═══ Billing Field Card ═══ */
-function BillingFieldCard({ billingType, billingCycle, onSaveBillingType, onSaveBillingCycle }: {
-  billingType?: BillingType;
-  billingCycle?: BillingCycle;
-  onSaveBillingType: (value: string) => void;
-  onSaveBillingCycle: (value: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
+/* ─── Stage Selector (inline dropdown) ─── */
+function StageSelector({ value, columns, onChange }: { value: string; columns: { id: string; label: string; color: string }[]; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = columns.find(c => c.id === value);
 
-  const typeLabel = billingType ? getStageLabel(BILLING_TYPES, billingType) : null;
-  const cycleLabel = billingType === 'recurring' && billingCycle ? getStageLabel(BILLING_CYCLES, billingCycle) : null;
-  const displayText = typeLabel
-    ? `${typeLabel}${cycleLabel ? ` · ${cycleLabel}` : ''}`
-    : '';
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
 
-  if (editing) {
-    return (
-      <div className="rounded-lg p-2.5 border border-violet-200 dark:border-violet-700 bg-zinc-50 dark:bg-zinc-800/50 space-y-2">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-zinc-400"><Repeat className="w-3.5 h-3.5" /></span>
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Cobrança</span>
-          </div>
-          <button
-            onClick={() => setEditing(false)}
-            className="text-[9px] text-violet-500 hover:text-violet-700 font-medium cursor-pointer"
-          >
-            Fechar
-          </button>
-        </div>
-
-        {/* Billing Type Selector */}
-        <div className="flex gap-1">
-          {BILLING_TYPES.map((bt) => (
-            <button
-              key={bt.id}
-              onClick={() => onSaveBillingType(bt.id)}
-              className={cn(
-                'flex-1 px-2 py-1.5 rounded-md text-[10px] font-semibold transition-all border cursor-pointer',
-                billingType === bt.id
-                  ? bt.id === 'recurring'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                    : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
-                  : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800',
-              )}
-            >
-              {bt.label}
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer hover:text-primary transition-colors">
+        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: current?.color || '#A3A3A3' }} />
+        {current?.label || value}
+        <ChevronDown className="w-3 h-3 text-zinc-400" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl py-1 w-48 max-h-52 overflow-y-auto">
+          {columns.map(c => (
+            <button key={c.id} onClick={() => { onChange(c.id); setOpen(false); }}
+              className={cn('w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer', c.id === value && 'bg-zinc-50 dark:bg-zinc-800 font-medium')}>
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+              {c.label}
+              {c.id === value && <Check className="w-3 h-3 text-primary ml-auto" />}
             </button>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
 
-        {/* Billing Cycle Selector (only for recurring) */}
-        {billingType === 'recurring' && (
-          <div className="flex gap-1">
-            {BILLING_CYCLES.map((bc) => (
-              <button
-                key={bc.id}
-                onClick={() => onSaveBillingCycle(bc.id)}
-                className={cn(
-                  'flex-1 px-2 py-1.5 rounded-md text-[10px] font-semibold transition-all border cursor-pointer',
-                  billingCycle === bc.id
-                    ? 'bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-400'
-                    : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800',
-                )}
-              >
-                {bc.label}
-              </button>
+/* ─── Origin Selector ─── */
+function OriginSelector({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer hover:text-primary transition-colors">
+        {value || <span className="text-zinc-400 italic">Selecionar</span>}
+        <ChevronDown className="w-3 h-3 text-zinc-400" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl py-1 w-40 max-h-48 overflow-y-auto">
+          {LEAD_ORIGINS.map(o => (
+            <button key={o} onClick={() => { onSave(o); setOpen(false); }}
+              className={cn('w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer', o === value && 'bg-zinc-50 dark:bg-zinc-800 font-medium')}>
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Owner Selector ─── */
+function OwnerSelector({ ownerId, users, getUserById, onSave }: {
+  ownerId: string; users: { id: string; name: string; initials: string }[]; getUserById: (id: string) => any; onSave: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const owner = ownerId ? getUserById(ownerId) : undefined;
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 text-xs cursor-pointer hover:text-primary transition-colors">
+        {owner ? (
+          <>
+            <div className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="text-[7px] font-bold text-primary">{owner.initials}</span>
+            </div>
+            <span className="text-zinc-700 dark:text-zinc-300">{owner.name.split(' ')[0]}</span>
+          </>
+        ) : <span className="text-amber-500 italic">Sem responsável</span>}
+        <ChevronDown className="w-3 h-3 text-zinc-400" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl py-1 w-48 max-h-48 overflow-y-auto">
+          {users.map(u => (
+            <button key={u.id} onClick={() => { onSave(u.id); setOpen(false); }}
+              className={cn('w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-zinc-50 dark:hover:bg-zinc-800 cursor-pointer', u.id === ownerId && 'bg-zinc-50 dark:bg-zinc-800 font-medium')}>
+              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-[8px] font-bold text-primary">{u.initials}</span>
+              </div>
+              {u.name}
+              {u.id === ownerId && <Check className="w-3 h-3 text-primary ml-auto" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Date Input ─── */
+function DateInput({ value, onSave, alert }: { value: string; onSave: (v: string) => void; alert?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+
+  if (!editing) {
+    return (
+      <button onClick={() => setEditing(true)} className={cn('text-xs cursor-pointer hover:text-primary transition-colors', alert ? 'text-red-500 font-medium' : 'text-zinc-700 dark:text-zinc-300')}>
+        {value ? new Date(value).toLocaleDateString('pt-BR') : <span className="text-zinc-400 italic">Definir</span>}
+      </button>
+    );
+  }
+  return (
+    <input
+      ref={ref} type="date" defaultValue={value}
+      onBlur={(e) => { onSave(e.target.value); setEditing(false); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') { onSave((e.target as HTMLInputElement).value); setEditing(false); } }}
+      className="text-xs bg-transparent outline-none border-b border-primary/30 text-zinc-700 dark:text-zinc-300"
+    />
+  );
+}
+
+/* ─── Billing Selector ─── */
+function BillingSelector({ billingType, billingCycle, onSaveType, onSaveCycle }: {
+  billingType?: BillingType; billingCycle?: BillingCycle; onSaveType: (v: string) => void; onSaveCycle: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const label = billingType
+    ? `${getStageLabel(BILLING_TYPES, billingType)}${billingType === 'recurring' && billingCycle ? ` · ${getStageLabel(BILLING_CYCLES, billingCycle)}` : ''}`
+    : '';
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer hover:text-primary transition-colors">
+        {label || <span className="text-zinc-400 italic">Definir</span>}
+        <ChevronDown className="w-3 h-3 text-zinc-400" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl p-2.5 w-52">
+          <div className="flex gap-1 mb-2">
+            {BILLING_TYPES.map(bt => (
+              <button key={bt.id} onClick={() => onSaveType(bt.id)}
+                className={cn('flex-1 px-2 py-1 rounded text-[10px] font-semibold border cursor-pointer transition-all',
+                  billingType === bt.id
+                    ? bt.id === 'recurring' ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 text-emerald-700' : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 text-blue-700'
+                    : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50',
+                )}>{bt.label}</button>
             ))}
           </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="rounded-lg p-2.5 border transition-colors bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800 hover:border-violet-200 dark:hover:border-violet-700 cursor-pointer"
-      onClick={() => setEditing(true)}
-    >
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-zinc-400">
-          {billingType === 'recurring' ? <Repeat className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
-        </span>
-        <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Cobrança</span>
-      </div>
-      <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">
-        {displayText || <span className="text-zinc-400 font-normal italic">Adicionar...</span>}
-      </p>
-    </div>
-  );
-}
-
-/* ═══ Owner Field Card — pick responsible user ═══ */
-function OwnerFieldCard({ ownerId, users, getUserById, onSave }: {
-  ownerId: string;
-  users: { id: string; name: string; initials: string; avatarUrl?: string }[];
-  getUserById: (id: string) => { name: string; initials: string; avatarUrl?: string } | undefined;
-  onSave: (userId: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const owner = getUserById(ownerId);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <div
-        className="rounded-lg p-2.5 border transition-colors bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800 hover:border-violet-200 dark:hover:border-violet-700 cursor-pointer"
-        onClick={() => setOpen(!open)}
-      >
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-zinc-400"><User className="w-3.5 h-3.5" /></span>
-          <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Responsável</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {owner ? (
-            <>
-              <div className="w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
-                {owner.avatarUrl ? (
-                  <img src={owner.avatarUrl} className="w-5 h-5 rounded-full object-cover" alt="" />
-                ) : (
-                  <span className="text-[8px] font-bold text-violet-600 dark:text-violet-400">{owner.initials}</span>
-                )}
-              </div>
-              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{owner.name.split(' ')[0]}</span>
-            </>
-          ) : (
-            <span className="text-sm text-zinc-400 italic">Selecionar...</span>
+          {billingType === 'recurring' && (
+            <div className="flex gap-1">
+              {BILLING_CYCLES.map(bc => (
+                <button key={bc.id} onClick={() => { onSaveCycle(bc.id); setOpen(false); }}
+                  className={cn('flex-1 px-2 py-1 rounded text-[10px] font-semibold border cursor-pointer transition-all',
+                    billingCycle === bc.id ? 'bg-primary/10 border-primary/30 text-primary' : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50',
+                  )}>{bc.label}</button>
+              ))}
+            </div>
           )}
         </div>
-      </div>
-
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-52 overflow-y-auto">
-          {users.map((u) => (
-            <button
-              key={u.id}
-              className={cn(
-                'w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors cursor-pointer',
-                u.id === ownerId && 'bg-violet-50 dark:bg-violet-950/20 font-medium',
-              )}
-              onClick={() => { onSave(u.id); setOpen(false); }}
-            >
-              <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
-                {u.avatarUrl ? (
-                  <img src={u.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
-                ) : (
-                  <span className="text-[9px] font-bold text-violet-600 dark:text-violet-400">{u.initials}</span>
-                )}
-              </div>
-              <span className="text-zinc-700 dark:text-zinc-300 truncate">{u.name}</span>
-              {u.id === ownerId && <Check className="w-3.5 h-3.5 text-violet-500 ml-auto flex-shrink-0" />}
-            </button>
-          ))}
-        </div>
       )}
     </div>
   );
 }
 
-/* ═══ Select Field Card — dropdown selector ═══ */
-function SelectFieldCard({ icon, label, value, displayValue, options, onSave, showDot }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  displayValue: string;
-  options: { id: string; label: string; color?: string }[];
-  onSave: (value: string) => void;
-  showDot?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
-  const currentOption = options.find(o => o.id === value);
-
-  return (
-    <div ref={ref} className="relative">
-      <div
-        className="rounded-lg p-2.5 border transition-colors bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800 hover:border-violet-200 dark:hover:border-violet-700 cursor-pointer"
-        onClick={() => setOpen(!open)}
-      >
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-zinc-400">{icon}</span>
-          <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{label}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {showDot && currentOption?.color && (
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: currentOption.color }} />
-          )}
-          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{displayValue}</p>
-        </div>
-      </div>
-
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-52 overflow-y-auto">
-          {options.map((o) => (
-            <button
-              key={o.id}
-              className={cn(
-                'w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors cursor-pointer',
-                o.id === value && 'bg-violet-50 dark:bg-violet-950/20 font-medium',
-              )}
-              onClick={() => { onSave(o.id); setOpen(false); }}
-            >
-              {showDot && o.color && (
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: o.color }} />
-              )}
-              <span className="text-zinc-700 dark:text-zinc-300 truncate">{o.label}</span>
-              {o.id === value && <Check className="w-3.5 h-3.5 text-violet-500 ml-auto flex-shrink-0" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ═══ Date Field Card — date picker ═══ */
-function DateFieldCard({ icon, label, value, alert, editable, onSave }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  alert?: boolean;
-  editable?: boolean;
-  onSave?: (value: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
-
-  const displayDate = value
-    ? new Date(value).toLocaleDateString('pt-BR')
-    : '—';
-
-  // Format to YYYY-MM-DD for input[type=date]
-  const inputValue = value
-    ? new Date(value).toISOString().split('T')[0]
-    : '';
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (onSave && e.target.value) {
-      onSave(new Date(e.target.value).toISOString());
-    }
-    setEditing(false);
-  };
-
-  return (
-    <div
-      className={cn(
-        'rounded-lg p-2.5 border transition-colors relative',
-        alert
-          ? 'bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30'
-          : 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-100 dark:border-zinc-800',
-        editable && !editing && 'hover:border-violet-200 dark:hover:border-violet-700 cursor-pointer',
-      )}
-      onClick={() => { if (editable && !editing) setEditing(true); }}
-    >
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className={alert ? 'text-red-500' : 'text-zinc-400'}>{icon}</span>
-        <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{label}</span>
-      </div>
-      {editing ? (
-        <input
-          ref={ref}
-          type="date"
-          defaultValue={inputValue}
-          onChange={handleChange}
-          onBlur={() => setEditing(false)}
-          className="text-sm font-medium bg-transparent outline-none border-b border-violet-400 w-full text-zinc-800 dark:text-zinc-200 dark:[color-scheme:dark]"
-        />
-      ) : (
-        <p className={cn('text-sm font-medium truncate', alert ? 'text-red-600 dark:text-red-400' : 'text-zinc-800 dark:text-zinc-200')}>
-          {displayDate}
-        </p>
-      )}
-    </div>
-  );
-}
+/* ─── Helpers ─── */
+function formatCnpj(v: string) { return v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'); }
+function stripCnpj(v: string) { return v.replace(/\D/g, ''); }

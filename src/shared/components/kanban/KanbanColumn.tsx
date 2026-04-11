@@ -145,7 +145,7 @@ export function KanbanColumn<T extends { id: string }>({
       </div>
 
       {/* Cards container */}
-      <div className="flex-1 p-2 overflow-y-auto max-h-[calc(100vh-220px)] min-h-[80px]">
+      <div className="flex-1 p-2 overflow-y-auto min-h-0">
         <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-2">
             {items.map((item) => (

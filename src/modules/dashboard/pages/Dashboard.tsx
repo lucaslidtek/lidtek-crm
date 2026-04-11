@@ -88,11 +88,9 @@ export function Dashboard() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-foreground">
-            {greeting}, {user?.name?.split(' ')[0] ?? 'Usuário'}
+            Dashboard
           </h1>
-          <p className="text-sm text-foreground-muted mt-0.5">
-            {now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })} — Visão geral do sistema
-          </p>
+          <p className="text-sm text-foreground-muted mt-0.5">Visão geral do sistema</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={() => setCreateLeadOpen(true)}>

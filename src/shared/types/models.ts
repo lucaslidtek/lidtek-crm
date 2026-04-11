@@ -91,12 +91,16 @@ export interface Lead {
   updatedAt: string;
 }
 
+export type SprintPriority = 'high' | 'medium' | 'low';
+
 export interface Sprint {
   id: string;
   projectId: string;
   name: string;
   stage: ProjectStage;
+  priority: SprintPriority;
   startDate: string;
+  dueDate?: string;
   endDate?: string;
   status: 'active' | 'completed';
   taskIds: string[];

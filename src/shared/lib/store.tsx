@@ -34,6 +34,7 @@ interface StoreActions {
   createTask: (data: Parameters<typeof api.tasks.create>[0]) => Promise<Task>;
   updateTask: (id: string, data: Partial<Task>) => Promise<Task>;
   moveTaskStatus: (id: string, status: TaskStatus) => Promise<Task>;
+  deleteTask: (id: string) => Promise<void>;
   // Sprints
   createSprint: (projectId: string, data: Parameters<typeof api.sprints.create>[1]) => Promise<void>;
   updateSprint: (sprintId: string, data: Partial<Sprint>) => Promise<void>;
@@ -121,17 +122,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshLeads = useCallback(async () => {
     try {
       const fresh = await api.leads.list();
-      setLeads(current => {
-        if (current.length === 0) return fresh;
-        const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
-        return fresh.sort((a, b) => {
-          const orderA = orderMap.get(a.id) ?? 99999;
-          const orderB = orderMap.get(b.id) ?? 99999;
-          return orderA - orderB;
-        });
-      });
+      setLeads(fresh);
       // Re-enrich projects with updated lead data
       setProjects(current => enrichProjectsWithLeads(current, fresh));
+      // Update cache
+      if (_cache) _cache.leads = fresh;
     } catch (err) {
       console.warn('[Store] refreshLeads failed - preserving existing state:', err);
     }
@@ -143,15 +138,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Get current leads to enrich
       const currentLeads = await api.leads.list();
       const enriched = enrichProjectsWithLeads(fresh, currentLeads);
-      setProjects(current => {
-        if (current.length === 0) return enriched;
-        const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
-        return enriched.sort((a, b) => {
-          const orderA = orderMap.get(a.id) ?? 99999;
-          const orderB = orderMap.get(b.id) ?? 99999;
-          return orderA - orderB;
-        });
-      });
+      setProjects(enriched);
+      // Update cache
+      if (_cache) _cache.projects = enriched;
     } catch (err) {
       console.warn('[Store] refreshProjects failed — preserving existing state:', err);
     }
@@ -160,15 +149,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshTasks = useCallback(async () => {
     try {
       const fresh = await api.tasks.list();
-      setTasks(current => {
-        if (current.length === 0) return fresh;
-        const orderMap = new Map(current.map((item, idx) => [item.id, idx]));
-        return fresh.sort((a, b) => {
-          const orderA = orderMap.get(a.id) ?? 99999;
-          const orderB = orderMap.get(b.id) ?? 99999;
-          return orderA - orderB;
-        });
-      });
+      setTasks(fresh);
+      // Update cache
+      if (_cache) _cache.tasks = fresh;
     } catch (err) {
       console.warn('[Store] refreshTasks failed — preserving existing state:', err);
     }
@@ -177,7 +160,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshFunnelColumns = useCallback(async () => {
     try {
       const cols = await api.funnelColumns.list();
-      setFunnelColumns(cols.length > 0 ? cols : DEFAULT_FUNNEL_COLUMNS);
+      const resolved = cols.length > 0 ? cols : DEFAULT_FUNNEL_COLUMNS;
+      setFunnelColumns(resolved);
+      // Update cache
+      if (_cache) _cache.funnelColumns = resolved;
     } catch (err) {
       console.warn('[Store] refreshFunnelColumns failed:', err);
     }
@@ -259,29 +245,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // ─── Auth-driven data loading ───
   // Only fetch data when auth confirms the user is logged in.
-  // On logout, clear all data. On HMR, if auth is already confirmed
-  // from localStorage cache, data loads immediately.
-  //
-  // IMPORTANT: Only use the HMR cache if it actually contains data.
-  // An empty cache (e.g. poisoned by a prior failed fetch) must NOT
-  // block the next legitimate fetch attempt.
+  // On logout, clear all data. On HMR, cache provides instant hydration
+  // via useState initializers, but we ALWAYS re-fetch from Supabase to
+  // ensure data is fresh (cache is a UX optimization, not a data source).
   useEffect(() => {
     if (authLoading) return; // Auth still initializing — wait
 
     if (isAuthenticated) {
-      // Use cache only when it has real data (guards against poisoned empty cache)
-      const cacheIsValid =
-        _cache !== null &&
-        (_cache.leads.length > 0 ||
-          _cache.projects.length > 0 ||
-          _cache.tasks.length > 0 ||
-          _cache.users.length > 0);
-
-      if (cacheIsValid) {
-        fetchedRef.current = true;
-        return;
-      }
-      // Cold start OR invalidated cache — fetch from Supabase
       if (!fetchedRef.current) {
         fetchedRef.current = true;
         refreshAll();
@@ -368,6 +338,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return task;
   }, [refreshTasks]);
 
+  const deleteTask = useCallback(async (id: string) => {
+    await api.tasks.delete(id);
+    await refreshTasks();
+  }, [refreshTasks]);
+
   const createSprint = useCallback(async (projectId: string, data: Parameters<typeof api.sprints.create>[1]) => {
     const sprint = await api.sprints.create(projectId, data);
 
@@ -376,13 +351,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await api.tasks.create({
       title: data.name,
       type: 'project',
-      status: 'todo',
-      priority: 'medium',
+      status: 'in_progress',
+      priority: data.priority ?? 'medium',
       ownerId: project?.ownerId || users[0]?.id || '',
       tags: [],
       projectId,
       sprintId: sprint.id,
-      dueDate: data.endDate,
+      dueDate: data.dueDate,
     });
 
     await Promise.all([refreshProjects(), refreshTasks()]);
@@ -395,13 +370,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const completeSprint = useCallback(async (sprintId: string) => {
     await api.sprints.complete(sprintId);
-    await refreshProjects();
-  }, [refreshProjects]);
+    // Also mark the linked task as done
+    const linkedTask = tasks.find(t => t.sprintId === sprintId);
+    if (linkedTask && linkedTask.status !== 'done') {
+      await api.tasks.updateStatus(linkedTask.id, 'done');
+    }
+    await Promise.all([refreshProjects(), refreshTasks()]);
+  }, [refreshProjects, refreshTasks, tasks]);
 
   const deleteSprint = useCallback(async (sprintId: string) => {
+    // Delete ALL linked tasks first (avoid FK constraint on sprint_id)
+    const linkedTasks = tasks.filter(t => t.sprintId === sprintId);
+    if (linkedTasks.length > 0) {
+      await Promise.all(linkedTasks.map(t =>
+        api.tasks.delete(t.id).catch(err =>
+          console.warn(`[Store] Failed to delete linked task ${t.id}:`, err)
+        )
+      ));
+    }
     await api.sprints.delete(sprintId);
-    await refreshProjects();
-  }, [refreshProjects]);
+    await Promise.all([refreshProjects(), refreshTasks()]);
+  }, [refreshProjects, refreshTasks, tasks]);
 
   const getUserById = useCallback((id: string) => {
     return users.find(u => u.id === id);
@@ -414,7 +403,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshProjects]);
 
   const refreshUsers = useCallback(async () => {
-    setUsers(await api.users.list());
+    const fresh = await api.users.list();
+    setUsers(fresh);
+    if (_cache) _cache.users = fresh;
   }, []);
 
   const createUser = useCallback(async (data: Parameters<typeof api.users.create>[0]) => {
@@ -455,6 +446,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const sprint = await api.sprints.create(project.id, {
       name: 'Onboarding — Setup inicial',
       stage: 'onboarding',
+      priority: 'medium',
       startDate: new Date().toISOString(),
       status: 'active',
     });
@@ -506,7 +498,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       refreshLeads, refreshProjects, refreshTasks, refreshAll,
       createLead, updateLead, moveLeadStage, deleteLead,
       updateProject,
-      createTask, updateTask, moveTaskStatus,
+      createTask, updateTask, moveTaskStatus, deleteTask,
       createSprint,
       updateSprint,
       completeSprint,
