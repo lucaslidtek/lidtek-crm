@@ -176,8 +176,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Call getSession() to ensure the JWT is loaded into the Supabase client
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!mounted) return;
-        if (session?.user) {
+        // Check if the token is already expired
+        const isExpired = session?.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
+
+        if (session?.user && !isExpired) {
           loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+        } else if (session?.user && isExpired) {
+          // Token is expired. getSession returns it while refreshing in the background.
+          // Wait for a real network check to confirm if the refresh succeeded or not.
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (!mounted) return;
+            if (user) {
+              loadProfile(user as Parameters<typeof loadProfile>[0]);
+            } else {
+              setUser(null);
+              localStorage.removeItem(AUTH_STORAGE_KEY);
+            }
+            resolveLoading();
+          });
+          return; // resolveLoading will be called by getUser
         } else {
           // Session expired — clear cache and force re-login
           setUser(null);
@@ -195,13 +212,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!mounted) return;
           if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
             await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-          } else if (event === 'SIGNED_OUT') {
-            // Guard: only clear if truly signed out (not a transient refresh cycle).
-            // Wait briefly to see if TOKEN_REFRESHED follows.
+          } else if (event === 'SIGNED_OUT' || (event as string) === 'TOKEN_REFRESH_FAILED') {
+            // Guard: only clear if truly signed out or refresh permanently failed.
+            // Wait briefly to see if TOKEN_REFRESHED follows or check with server.
             setTimeout(() => {
               if (!mounted) return;
-              supabase.auth.getSession().then(({ data: { session: current } }) => {
-                if (!current) {
+              // Use getUser() here instead of getSession() because getSession may return a dead cached token.
+              supabase.auth.getUser().then(({ data: { user } }) => {
+                if (!user) {
                   setUser(null);
                   localStorage.removeItem(AUTH_STORAGE_KEY);
                 }
@@ -246,8 +264,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function fallbackGetSession() {
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (!mounted) return;
-        if (session?.user) {
+        const isExpired = session?.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
+
+        if (session?.user && !isExpired) {
           await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+        } else if (session?.user && isExpired) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await loadProfile(user as Parameters<typeof loadProfile>[0]);
+          } else {
+            setUser(null);
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+          }
         } else {
           setUser(null);
           localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -265,13 +293,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return;
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
           await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-        } else if (event === 'SIGNED_OUT') {
+        } else if (event === 'SIGNED_OUT' || (event as string) === 'TOKEN_REFRESH_FAILED') {
           // Guard: wait briefly before clearing to distinguish a real logout
           // from a transient SIGNED_OUT that occurs during token refresh.
           setTimeout(() => {
             if (!mounted) return;
-            supabase.auth.getSession().then(({ data: { session: current } }) => {
-              if (!current) {
+            supabase.auth.getUser().then(({ data: { user } }) => {
+              if (!user) {
                 setUser(null);
                 localStorage.removeItem(AUTH_STORAGE_KEY);
               }

@@ -180,6 +180,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         api.funnelColumns.list(),
       ]);
 
+      // ── Zombie-session guard ──
+      // If ALL collections came back empty but we already had data in cache,
+      // something is wrong (most likely the JWT expired and RLS silently
+      // returned empty arrays instead of an error). In this case, DON'T
+      // overwrite state — preserve what we have and let the AuthProvider
+      // handle the re-authentication cycle.
+      const allEmpty = u.length === 0 && l.length === 0 && p.length === 0 && t.length === 0 && fc.length === 0;
+      if (allEmpty && _cache && (_cache.leads.length > 0 || _cache.projects.length > 0 || _cache.users.length > 0 || _cache.tasks.length > 0)) {
+        console.warn('[Store] All collections returned empty but cache has data — possible expired token. Preserving state and forcing session recheck.');
+        // Force a session revalidation — if the token truly expired, AuthProvider
+        // will catch it and redirect to login. If the token is fine (e.g. user
+        // really has no data), the next refreshAll will succeed normally.
+        import('@/shared/lib/supabase').then(({ supabase }) => {
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (!user) {
+              // Session is truly dead — the AuthProvider listener will handle logout
+              supabase.auth.signOut();
+            } else {
+              // Session is valid — user genuinely has empty data, allow it
+              _cache = null; // Clear stale cache so next refresh accepts empty
+              fetchedRef.current = false; // Allow re-fetch on next cycle
+            }
+          });
+        });
+        setLoading(false);
+        return;
+      }
+
       // If users returned empty, the profile may still be being created (upsert race).
       // Retry once after 2s to catch the bootstrapped profile.
       const resolvedUsers = u.length > 0 ? u : await new Promise<typeof u>((resolve) => {
