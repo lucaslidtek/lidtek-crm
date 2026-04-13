@@ -5,6 +5,7 @@ import { cn } from '@/shared/utils/cn';
 import { Button } from '@/shared/components/ui/Button';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { useStore } from '@/shared/lib/store';
+import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import type { UserRole } from '@/shared/types/models';
 import { TeamMemberCard } from '../components/TeamMemberCard';
 import { AddMemberDialog } from '../components/AddMemberDialog';
@@ -24,6 +25,7 @@ export function TeamPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const filteredMembers = useMemo(() => {
     return users.filter((user) => {
@@ -96,11 +98,15 @@ export function TeamPage() {
       </div>
 
       {/* ── Content: Grid + Detail Panel side by side ── */}
-      <div className="flex flex-1 min-h-0 gap-4">
-        {/* Main content — container with rounded corners */}
-        <div className="flex-1 min-w-0 overflow-y-auto h-full rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40 p-4">
+      <div className={cn('flex flex-1 min-h-0', !isMobile && 'gap-4')}>
+        {/* Main content */}
+        <div className={cn(
+          'flex-1 min-w-0 overflow-y-auto h-full',
+          !isMobile && 'rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40 p-4',
+          isMobile && 'p-0',
+        )}>
           {/* Members Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             <AnimatePresence mode="popLayout">
               {filteredMembers.map((member, index) => (
                 <motion.div

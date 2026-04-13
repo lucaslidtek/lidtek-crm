@@ -99,6 +99,10 @@ function rowToSprint(row: any): Sprint {
 
 function rowToProject(row: any, taskIds: string[] = []): Project {
   const sprints = (row.sprints ?? []).map(rowToSprint);
+  // Support both owner_ids (array) and legacy owner_id (single)
+  const ownerIds: string[] = row.owner_ids && row.owner_ids.length > 0
+    ? row.owner_ids
+    : row.owner_id ? [row.owner_id] : [];
   return {
     id: row.id,
     clientName: row.client_name,
@@ -106,7 +110,7 @@ function rowToProject(row: any, taskIds: string[] = []): Project {
     clientPhone: row.client_phone ?? undefined,
     type: row.type,
     status: row.status,
-    ownerId: row.owner_id,
+    ownerIds,
     currentSprintId: row.current_sprint_id ?? undefined,
     sprints,
     taskIds,
@@ -170,12 +174,21 @@ function buildProjectUpdate(updates: Partial<Project>): Record<string, any> {
   if (updates.clientPhone !== undefined) payload.client_phone = updates.clientPhone;
   if (updates.type !== undefined) payload.type = updates.type;
   if (updates.status !== undefined) payload.status = updates.status;
-  if (updates.ownerId !== undefined) payload.owner_id = updates.ownerId;
+  if (updates.ownerIds !== undefined) {
+    payload.owner_ids = updates.ownerIds;
+    payload.owner_id = updates.ownerIds[0] ?? null;
+  }
   if (updates.currentSprintId !== undefined) payload.current_sprint_id = updates.currentSprintId;
   if (updates.nextDeliveryDate !== undefined) payload.next_delivery_date = updates.nextDeliveryDate;
   if (updates.leadId !== undefined) payload.lead_id = updates.leadId;
   payload.updated_at = new Date().toISOString();
   return payload;
+}
+
+// Build payload without owner_ids for DBs that haven't migrated yet
+function buildProjectUpdateLegacy(payload: Record<string, any>): Record<string, any> {
+  const { owner_ids, ...rest } = payload;
+  return rest;
 }
 
 function buildTaskUpdate(updates: Partial<Task>): Record<string, any> {
@@ -467,42 +480,77 @@ export const api = {
 
     create: async (input: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'sprints' | 'taskIds'>): Promise<Project> => {
       const now = new Date().toISOString();
-      const { data, error } = await supabase
+      const basePayload = {
+        client_name: input.clientName,
+        client_contact: input.clientContact,
+        client_phone: input.clientPhone,
+        type: input.type,
+        status: input.status,
+        owner_id: input.ownerIds?.[0] ?? null,
+        current_sprint_id: input.currentSprintId,
+        next_delivery_date: input.nextDeliveryDate,
+        lead_id: input.leadId,
+        created_at: now,
+        updated_at: now,
+      };
+
+      // Try with owner_ids first, fall back to legacy if column doesn't exist
+      let result = await supabase
         .from('projects')
-        .insert({
-          client_name: input.clientName,
-          client_contact: input.clientContact,
-          client_phone: input.clientPhone,
-          type: input.type,
-          status: input.status,
-          owner_id: input.ownerId,
-          current_sprint_id: input.currentSprintId,
-          next_delivery_date: input.nextDeliveryDate,
-          lead_id: input.leadId,
-          created_at: now,
-          updated_at: now,
-        })
+        .insert({ ...basePayload, owner_ids: input.ownerIds ?? [] })
         .select('*, sprints!sprints_project_id_fkey(*)')
         .single();
-      if (error) throw new Error(formatSupabaseError('projects.create', error));
-      return rowToProject(data, []);
+
+      if (result.error?.message?.includes('owner_ids')) {
+        console.warn('[API] owner_ids column not found, using legacy mode');
+        result = await supabase
+          .from('projects')
+          .insert(basePayload)
+          .select('*, sprints!sprints_project_id_fkey(*)')
+          .single();
+      }
+
+      if (result.error) throw new Error(formatSupabaseError('projects.create', result.error));
+      return rowToProject(result.data, []);
     },
 
     update: async (id: string, updates: Partial<Project>): Promise<Project> => {
-      const { data, error } = await supabase
+      const payload = buildProjectUpdate(updates);
+      let result = await supabase
         .from('projects')
-        .update(buildProjectUpdate(updates))
+        .update(payload)
         .eq('id', id)
         .select('*, sprints!sprints_project_id_fkey(*)')
         .single();
-      if (error) throw new Error(formatSupabaseError('projects.update', error));
+
+      // Retry without owner_ids if column doesn't exist
+      if (result.error?.message?.includes('owner_ids')) {
+        console.warn('[API] owner_ids column not found on update, using legacy mode');
+        result = await supabase
+          .from('projects')
+          .update(buildProjectUpdateLegacy(payload))
+          .eq('id', id)
+          .select('*, sprints!sprints_project_id_fkey(*)')
+          .single();
+      }
+
+      if (result.error) throw new Error(formatSupabaseError('projects.update', result.error));
 
       const { data: tasks } = await supabase
         .from('tasks')
         .select('id')
         .eq('project_id', id);
 
-      return rowToProject(data, (tasks ?? []).map(t => t.id));
+      return rowToProject(result.data, (tasks ?? []).map(t => t.id));
+    },
+
+    delete: async (id: string): Promise<boolean> => {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id);
+      if (error) throw new Error(formatSupabaseError('projects.delete', error));
+      return true;
     },
   },
 

@@ -33,11 +33,11 @@ export function PageHeader({
   const isActive = focused || !!searchQuery;
 
   return (
-    <div className={cn('flex items-center gap-2 sm:gap-3 mb-6 flex-wrap sm:flex-nowrap', className)}>
+    <div className={cn('flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 mb-4 sm:mb-6', className)}>
 
       {/* ── Search — primary, takes available space ── */}
       {hasSearch && (
-        <div className="relative flex-1 min-w-[180px] max-w-sm w-full sm:w-auto">
+        <div className="relative flex-1 min-w-0 w-full sm:max-w-sm">
           {/* Icon */}
           <Search
             className={cn(
@@ -56,7 +56,7 @@ export function PageHeader({
             onBlur={() => setFocused(false)}
             placeholder={searchPlaceholder}
             className={cn(
-              'w-full h-9 pl-9 pr-8 rounded-lg text-sm transition-all duration-200',
+              'w-full h-10 sm:h-9 pl-9 pr-8 rounded-lg text-sm transition-all duration-200',
               'border bg-black/[0.04] dark:bg-white/[0.04]',
               'text-foreground placeholder:text-foreground-muted/50',
               'focus:outline-none',
@@ -73,7 +73,7 @@ export function PageHeader({
                 onSearchChange('');
                 inputRef.current?.focus();
               }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-foreground-muted hover:text-foreground transition-colors"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-foreground-muted hover:text-foreground transition-colors touch-target flex items-center justify-center"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -81,12 +81,13 @@ export function PageHeader({
         </div>
       )}
 
-      {/* ── Actions — grouped right, never wrap individually ── */}
+      {/* ── Actions — horizontal scroll on mobile, grouped right on desktop ── */}
       {actions && (
-        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 sm:ml-auto sm:shrink-0 overflow-x-auto hide-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0">
           {actions}
         </div>
       )}
     </div>
   );
 }
+

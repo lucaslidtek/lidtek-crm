@@ -223,3 +223,87 @@
 @utility animate-slide-in {
   animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* --- Mobile Native Utilities --- */
+
+/* Slide up from bottom (for bottom sheets) */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@utility animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@utility animate-slide-down {
+  animation: slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Touch press feedback — use on interactive elements */
+@utility press-scale {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  &:active {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+}
+
+/* Safe area bottom padding */
+@utility safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
+}
+
+/* Drag handle indicator inside bottom sheets */
+@utility drag-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
+}
+
+:is(html.dark) .drag-handle {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Hide scrollbar on mobile for native feel */
+@media (max-width: 767px) {
+  body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Touch-friendly minimum target size */
+@utility touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}

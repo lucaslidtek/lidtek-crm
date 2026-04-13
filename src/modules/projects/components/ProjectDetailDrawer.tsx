@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Check, Clock, Calendar, Briefcase, Tag, Layers, Trash2, Pencil, CheckCircle2 } from 'lucide-react';
 import { WhatsAppIcon } from '@/shared/components/icons/WhatsAppIcon';
-import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/utils/cn';
 import { ProjectTypeBadge, Badge } from '@/shared/components/ui/Badge';
+import { MobileDrawerWrapper } from '@/shared/components/layout/MobileDrawerWrapper';
 import { useStore } from '@/shared/lib/store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { PROJECT_STAGES, getStageLabel, getStageColor } from '@/shared/lib/constants';
@@ -55,7 +55,7 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
   const [, setLocation] = useLocation();
 
   // Null-safe derived state
-  const editable = project ? canEdit(project.ownerId) : false;
+  const editable = project ? project.ownerIds.some(id => canEdit(id)) || project.ownerIds.length === 0 : false;
   const linkedLead = project ? leads.find(l => l.id === project.leadId) : undefined;
   const currentSprint = project ? project.sprints.find(s => s.id === project.currentSprintId) : undefined;
   const stageColor = currentSprint ? getStageColor(PROJECT_STAGES, currentSprint.stage) : '#A3A3A3';
@@ -77,18 +77,14 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
   };
 
   return (
-    <AnimatePresence mode="wait">
+    <MobileDrawerWrapper
+      itemKey={project?.id ?? null}
+      open={!!project}
+      onClose={onClose}
+      desktopWidth={420}
+    >
       {project && (
-        <motion.aside
-          key={project.id}
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 420, opacity: 1 }}
-          exit={{ width: 0, opacity: 0 }}
-          transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-          className="flex-shrink-0 rounded-xl border border-zinc-200/60 dark:border-zinc-700/40 bg-white dark:bg-zinc-900 overflow-hidden"
-          style={{ height: '100%' }}
-        >
-          <div className="w-[420px] h-full flex flex-col overflow-y-auto">
+        <div className="h-full flex flex-col overflow-y-auto">
             {/* ═══ Header ═══ */}
             <div className="px-5 pt-4 pb-3">
               <div className="flex items-center justify-between mb-3">
@@ -119,38 +115,12 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
               <Section title="Detalhes" icon={<Briefcase className="w-3.5 h-3.5" />}>
                 <div className="space-y-0.5">
                   <DetailRow label="Responsável">
-                    <OwnerSelect
-                      ownerId={project.ownerId}
+                    <MultiOwnerSelect
+                      ownerIds={project.ownerIds}
                       users={users}
                       getUserById={getUserById}
-                      onSave={(id) => handleFieldSave('ownerId', id)}
+                      onSave={(ids) => updateProject(project.id, { ownerIds: ids })}
                     />
-                  </DetailRow>
-                  <DetailRow label="Tipo">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => updateProject(project.id, { type: 'recurring' })}
-                        className={cn(
-                          'px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer',
-                          project.type === 'recurring'
-                            ? 'bg-primary/15 text-primary'
-                            : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                        )}
-                      >
-                        Recorrente
-                      </button>
-                      <button
-                        onClick={() => updateProject(project.id, { type: 'oneshot' })}
-                        className={cn(
-                          'px-2 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer',
-                          project.type === 'oneshot'
-                            ? 'bg-primary/15 text-primary'
-                            : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                        )}
-                      >
-                        Único
-                      </button>
-                    </div>
                   </DetailRow>
                   <DetailRow label="Telefone">
                     <div className="flex items-center gap-1.5">
@@ -293,10 +263,9 @@ export function ProjectDetailDrawer({ project, onClose }: ProjectDetailDrawerPro
                 <p>Criado em {new Date(project.createdAt).toLocaleDateString('pt-BR')}</p>
               </div>
             </div>
-          </div>
-        </motion.aside>
+        </div>
       )}
-    </AnimatePresence>
+    </MobileDrawerWrapper>
   );
 }
 
@@ -347,16 +316,16 @@ function EditableInline({ value, onSave, placeholder }: {
 }
 
 
-/* ─── Owner Select Dropdown ─── */
-function OwnerSelect({ ownerId, users, getUserById, onSave }: {
-  ownerId?: string;
+/* ─── Multi Owner Select ─── */
+function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
+  ownerIds: string[];
   users: { id: string; name: string; initials: string; avatarUrl?: string }[];
   getUserById: (id: string) => { name: string; initials: string; avatarUrl?: string } | undefined;
-  onSave: (userId: string) => void;
+  onSave: (userIds: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const owner = ownerId ? getUserById(ownerId) : undefined;
+  const owners = ownerIds.map(id => getUserById(id)).filter(Boolean);
 
   useEffect(() => {
     if (!open) return;
@@ -367,22 +336,35 @@ function OwnerSelect({ ownerId, users, getUserById, onSave }: {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const toggleUser = (userId: string) => {
+    const next = ownerIds.includes(userId)
+      ? ownerIds.filter(id => id !== userId)
+      : [...ownerIds, userId];
+    onSave(next);
+  };
+
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors"
+        className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors flex-wrap"
       >
-        {owner ? (
+        {owners.length > 0 ? (
           <>
-            <div className="w-4 h-4 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-              {owner.avatarUrl ? (
-                <img src={owner.avatarUrl} className="w-4 h-4 rounded-full object-cover" alt="" />
-              ) : (
-                <span className="text-[7px] font-bold text-primary">{owner.initials}</span>
-              )}
+            <div className="flex items-center -space-x-1">
+              {owners.map((owner, i) => (
+                <div key={i} className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center border-2 border-white dark:border-zinc-900" title={owner!.name}>
+                  {owner!.avatarUrl ? (
+                    <img src={owner!.avatarUrl} className="w-5 h-5 rounded-full object-cover" alt="" />
+                  ) : (
+                    <span className="text-[7px] font-bold text-primary">{owner!.initials}</span>
+                  )}
+                </div>
+              ))}
             </div>
-            <span className="text-xs">{owner.name.split(' ')[0]}</span>
+            <span className="text-xs">
+              {owners.length === 1 ? owners[0]!.name.split(' ')[0] : `${owners.length} pessoas`}
+            </span>
           </>
         ) : (
           <span className="text-xs text-amber-500 italic">Sem responsável</span>
@@ -390,27 +372,36 @@ function OwnerSelect({ ownerId, users, getUserById, onSave }: {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-44 overflow-y-auto">
-          {users.map((u) => (
-            <button
-              key={u.id}
-              className={cn(
-                'w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-primary/5 transition-colors cursor-pointer',
-                u.id === ownerId && 'bg-primary/5 font-medium',
-              )}
-              onClick={() => { onSave(u.id); setOpen(false); }}
-            >
-              <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-                {u.avatarUrl ? (
-                  <img src={u.avatarUrl} className="w-5 h-5 rounded-full object-cover" alt="" />
-                ) : (
-                  <span className="text-[8px] font-bold text-primary">{u.initials}</span>
+        <div className="absolute top-full left-0 mt-1 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-48 overflow-y-auto">
+          <p className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">Selecione os responsáveis</p>
+          {users.map((u) => {
+            const isSelected = ownerIds.includes(u.id);
+            return (
+              <button
+                key={u.id}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-primary/5 transition-colors cursor-pointer',
+                  isSelected && 'bg-primary/5',
                 )}
-              </div>
-              <span className="text-zinc-700 dark:text-zinc-300 truncate">{u.name}</span>
-              {u.id === ownerId && <Check className="w-3 h-3 text-primary ml-auto flex-shrink-0" />}
-            </button>
-          ))}
+                onClick={() => toggleUser(u.id)}
+              >
+                <div className={cn(
+                  'w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors',
+                  isSelected ? 'bg-primary border-primary text-white' : 'border-zinc-300 dark:border-zinc-600'
+                )}>
+                  {isSelected && <Check className="w-2.5 h-2.5" />}
+                </div>
+                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                  {u.avatarUrl ? (
+                    <img src={u.avatarUrl} className="w-5 h-5 rounded-full object-cover" alt="" />
+                  ) : (
+                    <span className="text-[8px] font-bold text-primary">{u.initials}</span>
+                  )}
+                </div>
+                <span className="text-zinc-700 dark:text-zinc-300 truncate">{u.name}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
   Mail,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { Button } from '@/shared/components/ui/Button';
+import { MobileDrawerWrapper } from '@/shared/components/layout/MobileDrawerWrapper';
 import { useStore } from '@/shared/lib/store';
 import type { User, UserRole } from '@/shared/types/models';
 
@@ -224,18 +224,14 @@ export function MemberDetailDrawer({ member, onClose }: MemberDetailDrawerProps)
   }
 
   return (
-    <AnimatePresence mode="wait">
+    <MobileDrawerWrapper
+      itemKey={member?.id ?? null}
+      open={!!member}
+      onClose={onClose}
+      desktopWidth={380}
+    >
       {member && (
-        <motion.aside
-          key={member.id}
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 380, opacity: 1 }}
-          exit={{ width: 0, opacity: 0 }}
-          transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-          className="flex-shrink-0 rounded-xl border border-zinc-200/60 dark:border-zinc-700/40 bg-white dark:bg-zinc-900 overflow-hidden"
-          style={{ height: '100%' }}
-        >
-          <div className="w-[380px] h-full flex flex-col overflow-y-auto">
+        <div className="h-full flex flex-col overflow-y-auto">
             {/* ═══ Header ═══ */}
             <div className="px-5 pt-4 pb-3">
               <div className="flex items-center justify-between mb-3">
@@ -409,9 +405,8 @@ export function MemberDetailDrawer({ member, onClose }: MemberDetailDrawerProps)
 
 
             </div>
-          </div>
-        </motion.aside>
+        </div>
       )}
-    </AnimatePresence>
+    </MobileDrawerWrapper>
   );
 }

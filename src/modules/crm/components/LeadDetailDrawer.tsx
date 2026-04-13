@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/utils/cn';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
+import { MobileDrawerWrapper } from '@/shared/components/layout/MobileDrawerWrapper';
 import { useStore } from '@/shared/lib/store';
 import { LEAD_ORIGINS, BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageColor } from '@/shared/lib/constants';
 import type { Lead, Interaction, ProjectType, BillingType, BillingCycle, FunnelStage } from '@/shared/types/models';
@@ -156,19 +157,15 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
 
 
   return (
-    <AnimatePresence mode="wait">
+    <MobileDrawerWrapper
+      itemKey={lead?.id ?? null}
+      open={!!lead}
+      onClose={onClose}
+      desktopWidth={420}
+    >
       {lead && (
-        <motion.aside
-          key={lead.id}
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 420, opacity: 1 }}
-          exit={{ width: 0, opacity: 0 }}
-          transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-          className="flex-shrink-0 rounded-xl border border-zinc-200/60 dark:border-zinc-700/40 bg-white dark:bg-zinc-900 overflow-hidden"
-          style={{ height: '100%' }}
-        >
-          <div className="w-[420px] h-full flex flex-col overflow-y-auto">
-            {/* ═══ Header ═══ */}
+        <div className="h-full flex flex-col">
+          {/* ═══ Header ═══ */}
             <div className="px-5 pt-4 pb-3">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -552,21 +549,27 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                   <div className="rounded-lg p-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 space-y-2">
                     <div className="flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                      <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">Excluir permanentemente?</span>
+                      <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">Tem certeza?</span>
                     </div>
+                    <p className="text-[10px] text-red-600/80 dark:text-red-400/80 leading-relaxed">
+                      Isso excluirá permanentemente o lead
+                      {hasProject && <>, o <strong>projeto vinculado</strong>, suas sprints</>}
+                      {linkedTasks.length > 0 && <> e <strong>{linkedTasks.length} tarefa{linkedTasks.length > 1 ? 's' : ''}</strong></>}
+                      . Esta ação não pode ser desfeita.
+                    </p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setConfirmDelete(false)}
-                        className="flex-1 px-2 py-1 text-[10px] font-medium rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                        className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                       >
                         Cancelar
                       </button>
                       <button
                         onClick={handleDelete}
                         disabled={deleting}
-                        className="flex-1 px-2 py-1 text-[10px] font-medium rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors cursor-pointer disabled:opacity-50"
+                        className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors cursor-pointer disabled:opacity-50"
                       >
-                        {deleting ? 'Excluindo...' : 'Sim, excluir'}
+                        {deleting ? 'Excluindo...' : 'Sim, excluir tudo'}
                       </button>
                     </div>
                   </div>
@@ -579,10 +582,9 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                 <p>Atualizado em {new Date(lead.updatedAt).toLocaleDateString('pt-BR')}</p>
               </div>
             </div>
-          </div>
-        </motion.aside>
+        </div>
       )}
-    </AnimatePresence>
+    </MobileDrawerWrapper>
   );
 }
 

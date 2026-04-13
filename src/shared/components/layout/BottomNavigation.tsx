@@ -5,31 +5,46 @@ import {
   Users,
   FolderKanban,
   ListTodo,
+  UsersRound,
 } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
+import { usePermissions } from '@/shared/hooks/usePermissions';
 
-const navItems = [
+interface NavItem {
+  path: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  requiresAdmin?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { path: '/', label: 'Dash', icon: LayoutDashboard },
   { path: '/crm', label: 'CRM', icon: Users },
   { path: '/projects', label: 'Projetos', icon: FolderKanban },
   { path: '/tasks', label: 'Tarefas', icon: ListTodo },
+  { path: '/team', label: 'Equipe', icon: UsersRound, requiresAdmin: true },
 ];
 
 export function BottomNavigation() {
   const [location, setLocation] = useLocation();
+  const { canEditAll } = usePermissions();
+
+  // Filter items by permission — Team only visible for admin/manager
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.requiresAdmin || canEditAll
+  );
 
   return (
     <nav
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50',
-        'glass flex items-center justify-around px-2',
+        'glass flex items-center justify-around',
         // Padding condicional para suportar "notch" do iOS no aparelho
-        // pt-2 + pb-safe
-        'pt-2 pb-[max(calc(env(safe-area-inset-bottom)+0.5rem),0.5rem)]',
+        'pt-1 pb-[max(calc(env(safe-area-inset-bottom)+0.25rem),0.5rem)]',
         'border-t border-border-subtle md:hidden' // Esconde no desktop
       )}
     >
-      {navItems.map((item) => {
+      {visibleItems.map((item) => {
         const isActive =
           item.path === '/'
             ? location === '/'
@@ -40,32 +55,36 @@ export function BottomNavigation() {
           <button
             key={item.path}
             onClick={() => setLocation(item.path)}
-            className="relative flex flex-col items-center justify-center p-2 w-16 group"
+            className={cn(
+              'relative flex flex-col items-center justify-center gap-0.5',
+              'min-w-[48px] min-h-[48px] px-2 py-1',
+              'press-scale',
+            )}
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             {/* Active background glow/indicator */}
             {isActive && (
               <motion.div
                 layoutId="bottomNavIndicator"
-                className="absolute inset-0 bg-primary/10 rounded-xl"
+                className="absolute inset-1 bg-primary/10 rounded-xl"
                 transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
               />
             )}
             
             <Icon
               className={cn(
-                'w-[22px] h-[22px] mb-1 transition-colors duration-300 z-10',
+                'w-5 h-5 transition-colors duration-300 z-10',
                 isActive
                   ? 'text-primary'
-                  : 'text-foreground-muted group-hover:text-foreground'
+                  : 'text-foreground-muted'
               )}
             />
             <span
               className={cn(
-                'text-[10px] font-medium tracking-wide z-10 transition-colors duration-300',
+                'text-[9px] font-medium tracking-wide z-10 transition-colors duration-300',
                 isActive
                   ? 'text-primary font-bold'
-                  : 'text-foreground-muted group-hover:text-foreground'
+                  : 'text-foreground-muted'
               )}
             >
               {item.label}
@@ -76,3 +95,4 @@ export function BottomNavigation() {
     </nav>
   );
 }
+

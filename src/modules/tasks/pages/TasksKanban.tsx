@@ -8,8 +8,10 @@ import { TaskEditDialog } from '@/modules/tasks/components/TaskEditDialog';
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { useStore } from '@/shared/lib/store';
+import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import { Button } from '@/shared/components/ui/Button';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
+import { cn } from '@/shared/utils/cn';
 import { TASK_STATUSES } from '@/shared/lib/constants';
 import type { Task, TaskType, TaskPriority } from '@/shared/types/models';
 
@@ -22,8 +24,12 @@ export function TasksKanban() {
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const { tasks, reorderTasks, deleteTask } = useStore();
+  const isMobile = useIsMobile();
 
   const { tasksByStatus, moveTask } = useTasks({ type: typeFilter, priority: priorityFilter });
+
+  // Mobile: selected status tab
+  const [mobileStatus, setMobileStatus] = useState<string>('all');
 
   const filteredTasksByStatus = useMemo(() => {
     if (!search) return tasksByStatus;
@@ -39,6 +45,10 @@ export function TasksKanban() {
     );
   }, [tasksByStatus, search]);
 
+  const allFilteredTasks = useMemo(() => {
+    return Object.values(filteredTasksByStatus).flat();
+  }, [filteredTasksByStatus]);
+
   const filteredCount = useMemo(() => {
     if (!search) return tasks.length;
     const q = search.toLowerCase();
@@ -47,6 +57,12 @@ export function TasksKanban() {
       t.description?.toLowerCase().includes(q)
     ).length;
   }, [tasks, search]);
+
+  // Mobile: filtered tasks by selected status
+  const mobileFilteredTasks = useMemo(() => {
+    if (mobileStatus === 'all') return allFilteredTasks;
+    return filteredTasksByStatus[mobileStatus] ?? [];
+  }, [mobileStatus, allFilteredTasks, filteredTasksByStatus]);
 
   const n = filteredCount;
 
@@ -64,40 +80,117 @@ export function TasksKanban() {
   };
 
   return (
-    <div className="animate-fade-in">
-      <PageHeader
-        searchQuery={search}
-        onSearchChange={setSearch}
-        searchPlaceholder={search ? `${n} tarefa${n !== 1 ? 's' : ''} encontrada${n !== 1 ? 's' : ''}` : `Buscar entre ${tasks.length} tarefas...`}
-        actions={
-          <>
-            <TaskFilters
-              type={typeFilter}
-              priority={priorityFilter}
-              onTypeChange={setTypeFilter}
-              onPriorityChange={setPriorityFilter}
-            />
-            <Button onClick={() => setCreateOpen(true)} size="sm">
-              <Plus className="w-4 h-4" />
-              Nova Tarefa
-            </Button>
-          </>
-        }
-      />
+    <div className="animate-fade-in flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="flex-shrink-0">
+        <PageHeader
+          searchQuery={search}
+          onSearchChange={setSearch}
+          searchPlaceholder={search ? `${n} tarefa${n !== 1 ? 's' : ''} encontrada${n !== 1 ? 's' : ''}` : `Buscar entre ${tasks.length} tarefas...`}
+          actions={
+            <>
+              {!isMobile && (
+                <TaskFilters
+                  type={typeFilter}
+                  priority={priorityFilter}
+                  onTypeChange={setTypeFilter}
+                  onPriorityChange={setPriorityFilter}
+                />
+              )}
+              <Button onClick={() => setCreateOpen(true)} size="sm">
+                <Plus className="w-4 h-4" />
+                {isMobile ? 'Nova' : 'Nova Tarefa'}
+              </Button>
+            </>
+          }
+        />
+      </div>
 
-      <KanbanBoard<Task>
-        columns={TASK_STATUSES}
-        items={filteredTasksByStatus}
-        onMoveItem={moveTask}
-        renderCard={(task) => (
-          <TaskCard
-            task={task}
-            onEdit={setEditingTask}
-            onDelete={setDeletingTask}
+      {/* Mobile: Status tabs */}
+      {isMobile && (
+        <div className="flex-shrink-0 -mx-1 mb-3 overflow-x-auto hide-scrollbar">
+          <div className="flex items-center gap-1.5 px-1 min-w-max">
+            <button
+              onClick={() => setMobileStatus('all')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all press-scale whitespace-nowrap',
+                mobileStatus === 'all'
+                  ? 'bg-primary/15 text-primary'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-foreground-muted',
+              )}
+            >
+              Todas
+              <span className="text-[10px] opacity-70">{allFilteredTasks.length}</span>
+            </button>
+            {TASK_STATUSES.map((status) => {
+              const count = filteredTasksByStatus[status.id]?.length ?? 0;
+              return (
+                <button
+                  key={status.id}
+                  onClick={() => setMobileStatus(status.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all press-scale whitespace-nowrap',
+                    mobileStatus === status.id
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-foreground-muted',
+                  )}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: status.color }}
+                  />
+                  {status.label}
+                  <span className="text-[10px] opacity-70">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      <div className={cn(
+        'flex-1 min-h-0 overflow-hidden',
+        !isMobile && 'rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40',
+      )}>
+        {isMobile ? (
+          /* ── Mobile: card list filtered by status ── */
+          <div className="h-full overflow-y-auto space-y-2">
+            {mobileFilteredTasks.length > 0 ? (
+              mobileFilteredTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="glass rounded-lg p-3 press-scale transition-all"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <TaskCard
+                    task={task}
+                    onEdit={setEditingTask}
+                    onDelete={setDeletingTask}
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center justify-center h-32 text-foreground-muted text-sm">
+                Nenhuma tarefa encontrada
+              </div>
+            )}
+          </div>
+        ) : (
+          <KanbanBoard<Task>
+            columns={TASK_STATUSES}
+            items={filteredTasksByStatus}
+            onMoveItem={moveTask}
+            renderCard={(task) => (
+              <TaskCard
+                task={task}
+                onEdit={setEditingTask}
+                onDelete={setDeletingTask}
+              />
+            )}
+            onChangeOrder={(items) => reorderTasks(Object.values(items).flat())}
           />
         )}
-        onChangeOrder={(items) => reorderTasks(Object.values(items).flat())}
-      />
+      </div>
 
       {/* Create Dialog */}
       <TaskCreateDialog
@@ -127,3 +220,4 @@ export function TasksKanban() {
     </div>
   );
 }
+

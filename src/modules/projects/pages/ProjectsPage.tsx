@@ -9,6 +9,7 @@ import { ViewToggle, type ViewType } from '@/shared/components/ui/ViewToggle';
 import { ProjectListView } from '@/modules/projects/components/ProjectListView';
 import { ProjectCalendarView } from '@/modules/projects/components/ProjectCalendarView';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
+import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import { PROJECT_STAGES } from '@/shared/lib/constants';
 import type { Project, ProjectType, ProjectStatus } from '@/shared/types/models';
 
@@ -66,7 +67,8 @@ export function ProjectsPage() {
   const [search, setSearch] = useState('');
   const { projects, projectsByStage } = useProjects(filterType);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [view, setView] = useState<ViewType>('list');
+  const isMobile = useIsMobile();
+  const [view, setView] = useState<ViewType>(isMobile ? 'list' : 'list');
   const { projects: allProjects } = useStore();
 
   const selectedProject = selectedProjectId ? allProjects.find(p => p.id === selectedProjectId) ?? null : null;
@@ -158,7 +160,7 @@ export function ProjectsPage() {
                     key={option.id}
                     onClick={() => setStatusFilter(option.id)}
                     className={cn(
-                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer',
+                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer press-scale whitespace-nowrap',
                       statusFilter === option.id
                         ? 'bg-primary/15 text-primary'
                         : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
@@ -169,18 +171,20 @@ export function ProjectsPage() {
                 ))}
               </div>
 
-              <ViewToggle view={view} onChange={setView} />
+              {!isMobile && <ViewToggle view={view} onChange={setView} />}
             </>
           }
         />
       </div>
 
       {/* Content: Main + Detail Panel side by side */}
-      <div className="flex flex-1 min-h-0 gap-4">
-        {/* Main content — container with rounded corners */}
+      <div className={cn('flex flex-1 min-h-0', !isMobile && 'gap-4')}>
+        {/* Main content */}
         <div className={cn(
-          "flex-1 min-w-0 h-full rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40",
-          view === 'kanban' ? 'overflow-hidden' : 'overflow-y-auto p-4'
+          "flex-1 min-w-0 h-full",
+          !isMobile && 'rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40',
+          view === 'kanban' ? 'overflow-hidden' : 'overflow-y-auto',
+          !isMobile && view !== 'kanban' && 'p-4',
         )}>
           {view === 'list' ? (
             <ProjectListView
@@ -203,7 +207,7 @@ export function ProjectsPage() {
           )}
         </div>
 
-        {/* Detail Side Panel — inline, beside content */}
+        {/* Detail Side Panel */}
         <ProjectDetailDrawer
           project={selectedProject}
           onClose={() => setSelectedProjectId(null)}

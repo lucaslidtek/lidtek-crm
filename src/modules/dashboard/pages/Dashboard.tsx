@@ -8,9 +8,10 @@ import { PriorityBadge, TaskTypeBadge, Badge } from '@/shared/components/ui/Badg
 import {
   UserPlus, ListPlus, Calendar, AlertTriangle,
   TrendingUp, CheckCircle2, Clock, Zap,
-  Briefcase, Target, ChevronRight,
+  Briefcase, Target, ChevronRight, Plus,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import { LeadCreateDialog } from '@/modules/crm/components/LeadCreateDialog';
 import { TaskCreateDialog } from '@/modules/tasks/components/TaskCreateDialog';
 
@@ -20,10 +21,10 @@ export function Dashboard() {
   const [, setLocation] = useLocation();
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const now = new Date();
-  const hour = now.getHours();
-  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
   // ─── KPIs ───
   const activeLeads = leads.filter(l => l.stage !== 'lost' && l.stage !== 'contract_signed');
@@ -87,22 +88,60 @@ export function Dashboard() {
       {/* ═══════ Header Row ═══════ */}
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="font-[family-name:var(--font-display)] text-xl sm:text-2xl font-bold tracking-tight text-foreground">
             Dashboard
           </h1>
-          <p className="text-sm text-foreground-muted mt-0.5">Visão geral do sistema</p>
+          <p className="text-xs sm:text-sm text-foreground-muted mt-0.5">Visão geral do sistema</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setCreateLeadOpen(true)}>
-            <UserPlus className="w-3.5 h-3.5" />
-            Novo Lead
-          </Button>
-          <Button variant="primary" size="sm" onClick={() => setCreateTaskOpen(true)}>
-            <ListPlus className="w-3.5 h-3.5" />
-            Nova Tarefa
-          </Button>
-        </div>
+        {!isMobile && (
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setCreateLeadOpen(true)}>
+              <UserPlus className="w-3.5 h-3.5" />
+              Novo Lead
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => setCreateTaskOpen(true)}>
+              <ListPlus className="w-3.5 h-3.5" />
+              Nova Tarefa
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* ═══════ Mobile FAB ═══════ */}
+      {isMobile && (
+        <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end gap-2">
+          {fabOpen && (
+            <>
+              <button
+                onClick={() => { setCreateLeadOpen(true); setFabOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white dark:bg-zinc-800 shadow-lg border border-zinc-200 dark:border-zinc-700 press-scale"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <UserPlus className="w-4 h-4 text-primary" />
+                <span className="text-xs font-semibold text-foreground">Novo Lead</span>
+              </button>
+              <button
+                onClick={() => { setCreateTaskOpen(true); setFabOpen(false); }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white dark:bg-zinc-800 shadow-lg border border-zinc-200 dark:border-zinc-700 press-scale"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <ListPlus className="w-4 h-4 text-primary" />
+                <span className="text-xs font-semibold text-foreground">Nova Tarefa</span>
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => setFabOpen(!fabOpen)}
+            className={cn(
+              'w-14 h-14 rounded-full bg-primary text-white shadow-xl flex items-center justify-center press-scale transition-transform',
+              fabOpen && 'rotate-45',
+            )}
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        </div>
+      )}
 
       {/* ═══════ KPI Strip ═══════ */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -299,7 +338,8 @@ export function Dashboard() {
             {deliveringSoon.length > 0 ? (
               <div className="space-y-3">
                 {deliveringSoon.map(project => {
-                  const owner = project.ownerId ? getUserById(project.ownerId) : undefined;
+                  const owners = project.ownerIds.map(id => getUserById(id)).filter(Boolean);
+                  const ownerLabel = owners.length === 0 ? 'Sem resp.' : owners.length === 1 ? owners[0]!.name.split(' ')[0] : `${owners.length} resp.`;
                   const daysLeft = Math.ceil(
                     (new Date(project.nextDeliveryDate!).getTime() - Date.now()) / 86400000
                   );
@@ -325,7 +365,7 @@ export function Dashboard() {
                           {project.clientName}
                         </p>
                         <p className="text-[10px] text-foreground-muted">
-                          {owner?.name?.split(' ')[0]} · {new Date(project.nextDeliveryDate!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          {ownerLabel} · {new Date(project.nextDeliveryDate!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                         </p>
                       </div>
                       <Badge variant={project.type === 'recurring' ? 'recurring' : 'oneshot'}>

@@ -14,7 +14,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
         className={cn(
           'glass rounded-xl p-6',
           'transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
-          interactive && 'cursor-pointer hover:translate-y-[-4px] hover:glass-hover',
+          interactive && 'cursor-pointer hover:translate-y-[-4px] hover:glass-hover press-scale',
           className,
         )}
         {...props}

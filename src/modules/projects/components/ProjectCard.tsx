@@ -10,7 +10,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const { getUserById } = useStore();
-  const owner = project.ownerId ? getUserById(project.ownerId) : undefined;
+  const owners = project.ownerIds.map(id => getUserById(id)).filter(Boolean);
   const currentSprint = project.sprints.find(s => s.id === project.currentSprintId);
   const isDeliverySoon = project.nextDeliveryDate && 
     (new Date(project.nextDeliveryDate).getTime() - Date.now()) < 7 * 86400000 &&
@@ -35,19 +35,22 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-1">
-        {owner ? (
-          <div className="relative group/avatar">
-            <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center cursor-default">
-              {owner.avatarUrl ? (
-                <img src={owner.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
-              ) : (
-                <span className="text-[9px] font-bold text-primary">{owner.initials}</span>
-              )}
-            </div>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-zinc-800 dark:bg-zinc-700 text-white text-[10px] font-medium rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/avatar:opacity-100 transition-opacity shadow-lg">
-              {owner.name}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-800 dark:border-t-zinc-700" />
-            </div>
+        {owners.length > 0 ? (
+          <div className="flex items-center -space-x-1.5">
+            {owners.slice(0, 3).map((owner, i) => (
+              <div key={i} className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center border-2 border-white dark:border-zinc-900 cursor-default" title={owner!.name}>
+                {owner!.avatarUrl ? (
+                  <img src={owner!.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
+                ) : (
+                  <span className="text-[9px] font-bold text-primary">{owner!.initials}</span>
+                )}
+              </div>
+            ))}
+            {owners.length > 3 && (
+              <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[8px] font-bold text-foreground-muted border-2 border-white dark:border-zinc-900">
+                +{owners.length - 3}
+              </div>
+            )}
           </div>
         ) : (
           <div className="w-6 h-6 rounded-full border-2 border-dashed border-foreground-muted/30 flex items-center justify-center" title="Sem responsável">

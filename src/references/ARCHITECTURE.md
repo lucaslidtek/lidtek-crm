@@ -122,13 +122,16 @@ lidtek-crm/
 │   │   │   ├── layout/
 │   │   │   │   ├── Navbar.tsx
 │   │   │   │   ├── Sidebar.tsx
-│   │   │   │   └── PageLayout.tsx
+│   │   │   │   ├── PageLayout.tsx
+│   │   │   │   ├── BottomNavigation.tsx    # Tab bar mobile (hidden md:)
+│   │   │   │   └── MobileDrawerWrapper.tsx # Drawer → bottom sheet/side panel
 │   │   │   └── kanban/           # Componentes de Kanban reutilizáveis
 │   │   │       ├── KanbanBoard.tsx
 │   │   │       ├── KanbanColumn.tsx
 │   │   │       └── KanbanCard.tsx
 │   │   ├── hooks/                # Hooks genéricos
 │   │   │   ├── useAuth.ts
+│   │   │   ├── useIsMobile.ts    # Detecção mobile (< 640px)
 │   │   │   ├── useDragAndDrop.ts
 │   │   │   └── useDebounce.ts
 │   │   ├── types/                # Types globais
@@ -310,6 +313,47 @@ import { Route, Switch } from 'wouter';
 - Toast notifications para erros de API (usando Radix Toast)
 - Loading states com skeletons glassmorphism
 - Retry automático em falhas de rede (React Query default)
+
+### 4.6 Mobile Drawer Pattern (Portal)
+
+O `MobileDrawerWrapper` renderiza detail drawers de maneira responsiva:
+
+- **Desktop:** Painel lateral inline (`motion.aside`) com animação de largura, ao lado do conteúdo.
+- **Mobile:** Bottom sheet fullscreen (92vh) renderizado via `createPortal(overlay, document.body)`.
+
+**Razão do Portal:** O `<motion.main>` no `PageLayout` aplica `transform` via Framer Motion para animar `marginLeft` da sidebar. CSS rule: `position: fixed` dentro de um ancestral com `transform` fica preso ao stacking context do ancestral. Sem portal, o overlay do bottom sheet ficaria **atrás** do `BottomNavigation` (z-50) que está fora do `<motion.main>`.
+
+```typescript
+// Padrão correto: mobile overlay via portal
+if (isMobile) {
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm">
+          <motion.div className="absolute bottom-0 left-0 right-0 max-h-[92vh] h-[92vh] ...">
+            {children}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body, // Escapa do stacking context do motion.main
+  );
+}
+```
+
+### 4.7 Responsive Container Pattern
+
+Nas páginas de lista (CRM, Projects, Tasks, Team), o container com `rounded-xl bg-zinc-50/50 border` é **condicional**:
+
+```typescript
+<div className={cn(
+  'flex-1 min-w-0 overflow-hidden h-full',
+  !isMobile && 'rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40',
+)}>
+```
+
+- **Desktop:** Container com borda/fundo serve como "painel" visual ao lado do drawer inline.
+- **Mobile:** Sem container — os cards ficam full-bleed, sem ruído visual.
 
 ---
 

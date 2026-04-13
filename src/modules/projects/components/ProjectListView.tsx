@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '@/shared/lib/store';
+import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import type { Project, Sprint, ProjectStage, SprintPriority } from '@/shared/types/models';
 import { Badge, ProjectTypeBadge } from '@/shared/components/ui/Badge';
 import { PROJECT_STAGES, getStageLabel, getStageColor } from '@/shared/lib/constants';
-import { Briefcase, ChevronDown, Plus, Check, Clock, Circle, CalendarDays, Trash2, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react';
+import { Briefcase, ChevronDown, Plus, Check, Clock, Circle, CalendarDays, Trash2, ArrowUp, ArrowRight, ArrowDown, Pencil } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -21,6 +23,7 @@ const PRIORITY_CONFIG: Record<SprintPriority, { label: string; color: string; ic
 export function ProjectListView({ projects, onProjectClick }: ProjectListViewProps) {
   const { getUserById, createSprint, completeSprint, updateSprint, deleteSprint } = useStore();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const isMobile = useIsMobile();
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -34,7 +37,7 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
   return (
     <div className="space-y-3 animate-fade-in">
       {projects.map((project) => {
-        const owner = project.ownerId ? getUserById(project.ownerId) : undefined;
+        const owners = project.ownerIds.map(id => getUserById(id)).filter(Boolean);
         const currentSprint = project.sprints.find(s => s.id === project.currentSprintId);
         const completedCount = project.sprints.filter(s => s.status === 'completed').length;
         const isExpanded = expandedIds.has(project.id);
@@ -45,81 +48,177 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
             className="glass rounded-xl overflow-hidden transition-all duration-300"
           >
             {/* ── Main Row ── */}
-            <div
-              className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors group"
-              onClick={() => toggleExpand(project.id)}
-            >
-              {/* Expand Arrow */}
-              <button className="flex-shrink-0 p-0.5 text-foreground-muted">
-                <ChevronDown className={cn(
-                  'w-4 h-4 transition-transform duration-300',
-                  isExpanded && 'rotate-180'
-                )} />
-              </button>
-
-              {/* Icon */}
-              <div className="w-9 h-9 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center flex-shrink-0 text-foreground-muted group-hover:text-primary transition-colors">
-                <Briefcase className="w-4 h-4" />
-              </div>
-
-              {/* Client Name + Contact */}
-              <div className="flex-1 min-w-0">
-                <p
-                  className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); onProjectClick(project); }}
+            {isMobile ? (
+              /* ── Mobile: stacked layout ── */
+              <div
+                className="px-4 py-3"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                {/* Top: icon + name + badge → taps open project detail */}
+                <div
+                  className="flex items-start gap-3 press-scale"
+                  onClick={() => onProjectClick(project)}
                 >
-                  {project.clientName}
-                </p>
-                <p className="text-[11px] text-foreground-muted truncate">{project.clientContact}</p>
-              </div>
-
-              {/* Type Badge */}
-              <div className="flex-shrink-0">
-                <ProjectTypeBadge type={project.type} />
-              </div>
-
-              {/* Current Sprint (main highlight) */}
-              <div className="flex-shrink-0 max-w-[220px] min-w-[140px]">
-                {currentSprint ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
-                    <span className="text-xs font-medium text-foreground truncate">{currentSprint.name}</span>
+                  <div className="w-8 h-8 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center flex-shrink-0 text-foreground-muted mt-0.5">
+                    <Briefcase className="w-3.5 h-3.5" />
                   </div>
-                ) : (
-                  <span className="text-xs text-foreground-muted/50">Sem sprint ativa</span>
-                )}
-              </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-foreground leading-snug line-clamp-2">
+                      {project.clientName}
+                    </p>
+                    {project.clientContact && (
+                      <p className="text-[11px] text-foreground-muted truncate mt-0.5">{project.clientContact}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <ProjectTypeBadge type={project.type} />
+                  </div>
+                </div>
 
-              {/* Sprint Counter */}
-              <div className="flex-shrink-0 flex items-center gap-1.5 text-xs text-foreground-muted">
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5">
-                  <Check className="w-3 h-3 text-emerald-500" />
-                  <span className="font-medium">{completedCount}</span>
-                  <span className="text-foreground-muted/50">/</span>
-                  <span>{project.sprints.length}</span>
+                {/* Bottom row: sprint info → taps expand/collapse sprints */}
+                <div
+                  className="flex items-center gap-2 mt-2.5 ml-11 press-scale"
+                  onClick={() => toggleExpand(project.id)}
+                >
+                  {/* Current sprint — full visible */}
+                  <div className="flex-1 min-w-0">
+                    {currentSprint ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
+                        <span className="text-xs font-medium text-foreground leading-snug line-clamp-2">
+                          {currentSprint.name}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-foreground-muted/50">Sem sprint ativa</span>
+                    )}
+                  </div>
+
+                  {/* Sprint counter */}
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-xs text-foreground-muted flex-shrink-0">
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    <span className="font-medium">{completedCount}</span>
+                    <span className="text-foreground-muted/50">/</span>
+                    <span>{project.sprints.length}</span>
+                  </div>
+
+                  {/* Owners */}
+                  {owners.length > 0 && (
+                    <div className="flex items-center -space-x-1.5 flex-shrink-0">
+                      {owners.slice(0, 3).map((o, i) => (
+                        <div key={i} className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border-2 border-white dark:border-zinc-900" title={o!.name}>
+                          {o!.initials}
+                        </div>
+                      ))}
+                      {owners.length > 3 && (
+                        <div className="w-6 h-6 rounded-md bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-foreground-muted border-2 border-white dark:border-zinc-900">
+                          +{owners.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Expand chevron */}
+                  <ChevronDown className={cn(
+                    'w-4 h-4 text-foreground-muted transition-transform duration-300 flex-shrink-0',
+                    isExpanded && 'rotate-180'
+                  )} />
                 </div>
               </div>
+            ) : (
+              /* ── Desktop: horizontal row ── */
+              <div
+                className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors group"
+                onClick={() => toggleExpand(project.id)}
+              >
+                {/* Expand Arrow */}
+                <button className="flex-shrink-0 p-0.5 text-foreground-muted">
+                  <ChevronDown className={cn(
+                    'w-4 h-4 transition-transform duration-300',
+                    isExpanded && 'rotate-180'
+                  )} />
+                </button>
 
-              {/* Owner */}
-              <div className="flex-shrink-0 flex items-center gap-1.5">
-                <div className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
-                  {owner?.initials ?? '?'}
+                {/* Icon */}
+                <div className="w-9 h-9 rounded-lg bg-black/5 dark:bg-white/10 flex items-center justify-center flex-shrink-0 text-foreground-muted group-hover:text-primary transition-colors">
+                  <Briefcase className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] text-foreground-muted hidden lg:inline">{owner?.name?.split(' ')[0]}</span>
+
+                {/* Client Name + Contact */}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); onProjectClick(project); }}
+                  >
+                    {project.clientName}
+                  </p>
+                  <p className="text-[11px] text-foreground-muted truncate">{project.clientContact}</p>
+                </div>
+
+                {/* Type Badge */}
+                <div className="flex-shrink-0">
+                  <ProjectTypeBadge type={project.type} />
+                </div>
+
+                {/* Current Sprint (main highlight) */}
+                <div className="flex-shrink-0 max-w-[220px] min-w-[140px]">
+                  {currentSprint ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
+                      <span className="text-xs font-medium text-foreground truncate">{currentSprint.name}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-foreground-muted/50">Sem sprint ativa</span>
+                  )}
+                </div>
+
+                {/* Sprint Counter */}
+                <div className="flex-shrink-0 flex items-center gap-1.5 text-xs text-foreground-muted">
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5">
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    <span className="font-medium">{completedCount}</span>
+                    <span className="text-foreground-muted/50">/</span>
+                    <span>{project.sprints.length}</span>
+                  </div>
+                </div>
+
+                {/* Owners */}
+                <div className="flex-shrink-0 flex items-center gap-1.5">
+                  <div className="flex items-center -space-x-1.5">
+                    {owners.slice(0, 3).map((o, i) => (
+                      <div key={i} className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border-2 border-white dark:border-zinc-900" title={o!.name}>
+                        {o!.initials}
+                      </div>
+                    ))}
+                    {owners.length > 3 && (
+                      <div className="w-6 h-6 rounded-md bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-foreground-muted border-2 border-white dark:border-zinc-900">
+                        +{owners.length - 3}
+                      </div>
+                    )}
+                  </div>
+                  {owners.length === 1 && (
+                    <span className="text-[11px] text-foreground-muted hidden lg:inline">{owners[0]?.name?.split(' ')[0]}</span>
+                  )}
+                  {owners.length === 0 && (
+                    <span className="text-[11px] text-foreground-muted/40 hidden lg:inline italic">Sem resp.</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* ── Expanded: Sprint List ── */}
             <AnimatePresence>
               {isExpanded && (
                 <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
+                  initial={{ height: 0, opacity: 0, overflow: 'hidden' }}
+                  animate={{ height: 'auto', opacity: 1, overflow: 'visible' }}
+                  exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="overflow-hidden"
                 >
-                  <div className="border-t border-border-subtle px-5 py-3 bg-black/3 dark:bg-white/[0.02]">
+                  <div className={cn(
+                    'border-t border-border-subtle py-3 bg-black/3 dark:bg-white/[0.02]',
+                    isMobile ? 'px-3' : 'px-5',
+                  )}>
                     <div className="space-y-1">
                       {/* Sort: active first, then completed newest first */}
                       {[...project.sprints]
@@ -134,15 +233,16 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
                             sprint={sprint}
                             isActive={sprint.id === project.currentSprintId}
                             onComplete={() => completeSprint(sprint.id)}
-                            onRename={(newName) => updateSprint(sprint.id, { name: newName })}
+                            onUpdate={(updates) => updateSprint(sprint.id, updates)}
                             onDelete={() => deleteSprint(sprint.id)}
+                            isMobile={isMobile}
                           />
                         ))
                       }
                     </div>
 
                     {/* Add Sprint */}
-                    <AddSprintRow projectId={project.id} onAdd={createSprint} />
+                    <AddSprintRow projectId={project.id} onAdd={createSprint} isMobile={isMobile} />
                   </div>
                 </motion.div>
               )}
@@ -163,22 +263,26 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
 
 // ─── Sprint Row ───────────────────────────────────────
 
-function SprintRow({ sprint, isActive, onComplete, onRename, onDelete }: {
+function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile }: {
   sprint: Sprint;
   isActive: boolean;
   onComplete: () => void;
-  onRename: (newName: string) => void;
+  onUpdate: (updates: Partial<Sprint>) => void;
   onDelete: () => void;
+  isMobile: boolean;
 }) {
   const isCompleted = sprint.status === 'completed';
   const stageColor = getStageColor(PROJECT_STAGES, sprint.stage);
   const stageLabel = getStageLabel(PROJECT_STAGES, sprint.stage);
-  const priorityCfg = PRIORITY_CONFIG[sprint.priority ?? 'medium'];
+  const currentPriority = sprint.priority ?? 'medium';
+  const priorityCfg = PRIORITY_CONFIG[currentPriority];
   const PriorityIcon = priorityCfg.icon;
   const [completing, setCompleting] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editingDate, setEditingDate] = useState(false);
   const [draft, setDraft] = useState(sprint.name);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editing) {
@@ -186,6 +290,13 @@ function SprintRow({ sprint, isActive, onComplete, onRename, onDelete }: {
       inputRef.current?.select();
     }
   }, [editing]);
+
+  useEffect(() => {
+    if (editingDate) {
+      dateRef.current?.showPicker?.();
+      dateRef.current?.focus();
+    }
+  }, [editingDate]);
 
   const handleComplete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -201,7 +312,7 @@ function SprintRow({ sprint, isActive, onComplete, onRename, onDelete }: {
   const commitRename = () => {
     const trimmed = draft.trim();
     if (trimmed && trimmed !== sprint.name) {
-      onRename(trimmed);
+      onUpdate({ name: trimmed });
     } else {
       setDraft(sprint.name);
     }
@@ -212,6 +323,227 @@ function SprintRow({ sprint, isActive, onComplete, onRename, onDelete }: {
     setDraft(sprint.name);
     setEditing(false);
   };
+
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const priorityBtnRef = useRef<HTMLButtonElement>(null);
+
+  const openPriorityPicker = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isCompleted) return;
+    if (priorityBtnRef.current) {
+      const rect = priorityBtnRef.current.getBoundingClientRect();
+      setPickerPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setShowPriorityPicker(prev => !prev);
+  }, [isCompleted]);
+
+  // Close priority picker on outside click or scroll
+  useEffect(() => {
+    if (!showPriorityPicker) return;
+    const close = () => setShowPriorityPicker(false);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [showPriorityPicker]);
+
+  const selectPriority = (p: SprintPriority) => {
+    onUpdate({ priority: p });
+    setShowPriorityPicker(false);
+  };
+
+  const priorityPopover = showPriorityPicker ? createPortal(
+    <div
+      className="fixed z-[9999] glass rounded-lg border border-border-subtle shadow-xl p-1 min-w-[130px] animate-fade-in"
+      style={{ top: pickerPos.top, left: pickerPos.left }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {(['high', 'medium', 'low'] as SprintPriority[]).map((p) => {
+        const cfg = PRIORITY_CONFIG[p];
+        const Icon = cfg.icon;
+        const isSelected = currentPriority === p;
+        return (
+          <button
+            key={p}
+            onClick={(e) => { e.stopPropagation(); selectPriority(p); }}
+            className={cn(
+              'flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all cursor-pointer',
+              isSelected
+                ? p === 'high'
+                  ? 'bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400'
+                  : p === 'medium'
+                    ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                    : 'bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'
+                : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
+            )}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {cfg.label}
+            {isSelected && <Check className="w-3 h-3 ml-auto" />}
+          </button>
+        );
+      })}
+    </div>,
+    document.body
+  ) : null;
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    onUpdate({ dueDate: val || undefined });
+    setEditingDate(false);
+  };
+
+  const openDatePicker = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isCompleted) return;
+    setEditingDate(true);
+  };
+
+  if (isMobile) {
+    return (
+      <div className={cn(
+        'rounded-lg px-2.5 py-2.5 transition-all duration-200 group/sprint',
+        isActive
+          ? 'bg-violet-50/80 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/30'
+          : isCompleted
+            ? 'opacity-60'
+            : '',
+      )}>
+        {/* Row 1: checkbox + name + delete */}
+        <div className="flex items-start gap-2.5">
+          <button
+            onClick={handleComplete}
+            disabled={isCompleted || completing}
+            className={cn(
+              'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 transition-all border',
+              isCompleted
+                ? 'bg-emerald-500 border-emerald-500 text-white'
+                : 'border-zinc-300 dark:border-zinc-600',
+              completing && 'animate-pulse',
+            )}
+          >
+            {isCompleted && <Check className="w-3 h-3" />}
+          </button>
+
+          {editing ? (
+            <input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRename();
+                if (e.key === 'Escape') cancelRename();
+              }}
+              className="text-sm font-medium flex-1 min-w-0 bg-transparent outline-none border-b border-primary/40 focus:border-primary text-foreground py-0.5"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span
+              className={cn(
+                'text-sm flex-1 min-w-0 leading-snug',
+                isCompleted
+                  ? 'line-through text-foreground-muted'
+                  : 'font-medium text-foreground',
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isCompleted) {
+                  setDraft(sprint.name);
+                  setEditing(true);
+                }
+              }}
+            >
+              {sprint.name}
+            </span>
+          )}
+
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 press-scale"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Row 2: badges + date */}
+        <div className="flex items-center gap-1.5 mt-1.5 ml-[30px] flex-wrap">
+          {isActive && !isCompleted && (
+            <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+              <Circle className="w-2 h-2 fill-current" />
+              Ativa
+            </div>
+          )}
+          {/* Priority — custom popover (portal) */}
+          <div className="relative flex-shrink-0">
+            <button
+              ref={priorityBtnRef}
+              onClick={openPriorityPicker}
+              disabled={isCompleted}
+              className={cn(
+                'flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider border transition-all cursor-pointer',
+                currentPriority === 'high' && 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30',
+                currentPriority === 'medium' && 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30',
+                currentPriority === 'low' && 'text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30',
+                isCompleted && 'opacity-50 cursor-default',
+              )}
+            >
+              <PriorityIcon className="w-3 h-3" />
+              {priorityCfg.label}
+              <ChevronDown className={cn('w-2.5 h-2.5 transition-transform', showPriorityPicker && 'rotate-180')} />
+            </button>
+            {priorityPopover}
+          </div>
+          <Badge color={stageColor}>{stageLabel}</Badge>
+          {/* Due date — tap to edit */}
+          {editingDate ? (
+            <input
+              ref={dateRef}
+              type="date"
+              defaultValue={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : ''}
+              onChange={handleDateChange}
+              onBlur={() => setEditingDate(false)}
+              className="text-[10px] bg-transparent border border-border-subtle rounded px-1.5 py-0.5 text-foreground outline-none focus:ring-1 focus:ring-primary/30"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : sprint.dueDate && !isCompleted ? (
+            <button
+              onClick={openDatePicker}
+              className={cn(
+                'flex items-center gap-1 text-[10px] cursor-pointer rounded-md px-1.5 py-0.5 border transition-colors',
+                new Date(sprint.dueDate) < new Date()
+                  ? 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 font-semibold'
+                  : 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30',
+              )}
+              title="Clique para alterar data"
+            >
+              <CalendarDays className="w-3 h-3" />
+              {new Date(sprint.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+              <Pencil className="w-2.5 h-2.5 opacity-50" />
+            </button>
+          ) : !isCompleted ? (
+            <button
+              onClick={openDatePicker}
+              className="flex items-center gap-1 text-[10px] text-foreground-muted/50 hover:text-foreground-muted cursor-pointer rounded-md border border-dashed border-zinc-300 dark:border-zinc-600 px-1.5 py-0.5 hover:border-primary/40 transition-colors"
+              title="Definir data de previsão"
+            >
+              <CalendarDays className="w-3 h-3" />
+              + Prazo
+            </button>
+          ) : null}
+          {sprint.endDate && (
+            <span className="flex items-center gap-1 text-[10px] text-emerald-500">
+              <Check className="w-3 h-3" />
+              {new Date(sprint.endDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(
@@ -281,10 +613,25 @@ function SprintRow({ sprint, isActive, onComplete, onRename, onDelete }: {
         </div>
       )}
 
-      {/* Priority indicator */}
-      <div className={cn('flex items-center gap-0.5 flex-shrink-0', priorityCfg.color)} title={`Prioridade: ${priorityCfg.label}`}>
-        <PriorityIcon className="w-3.5 h-3.5" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider hidden sm:inline">{priorityCfg.label}</span>
+      {/* Priority — custom popover (portal) */}
+      <div className="relative flex-shrink-0">
+        <button
+          ref={priorityBtnRef}
+          onClick={openPriorityPicker}
+          disabled={isCompleted}
+          className={cn(
+            'flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider border transition-all cursor-pointer',
+            currentPriority === 'high' && 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30',
+            currentPriority === 'medium' && 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30',
+            currentPriority === 'low' && 'text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30',
+            isCompleted && 'opacity-50 cursor-default',
+          )}
+        >
+          <PriorityIcon className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">{priorityCfg.label}</span>
+          <ChevronDown className={cn('w-2.5 h-2.5 transition-transform', showPriorityPicker && 'rotate-180')} />
+        </button>
+        {priorityPopover}
       </div>
 
       {/* Stage badge */}
@@ -292,28 +639,45 @@ function SprintRow({ sprint, isActive, onComplete, onRename, onDelete }: {
 
       {/* Dates */}
       <div className="flex items-center gap-3 text-[10px] text-foreground-muted flex-shrink-0">
-        {/* Due date (prediction) */}
-        {sprint.dueDate && !isCompleted && (
-          <span className={cn(
-            'flex items-center gap-1',
-            new Date(sprint.dueDate) < new Date() ? 'text-red-500 font-semibold' : 'text-amber-500',
-          )} title="Previsão de conclusão">
+        {editingDate ? (
+          <input
+            ref={dateRef}
+            type="date"
+            defaultValue={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : ''}
+            onChange={handleDateChange}
+            onBlur={() => setEditingDate(false)}
+            className="text-xs bg-transparent border border-border-subtle rounded-md px-2 py-1 text-foreground outline-none focus:ring-1 focus:ring-primary/30"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : sprint.dueDate && !isCompleted ? (
+          <button
+            onClick={openDatePicker}
+            className={cn(
+              'flex items-center gap-1 cursor-pointer rounded-md px-1.5 py-0.5 border transition-colors',
+              new Date(sprint.dueDate) < new Date()
+                ? 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 font-semibold'
+                : 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30',
+            )}
+            title="Clique para alterar data"
+          >
             <CalendarDays className="w-3 h-3" />
             {new Date(sprint.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-          </span>
-        )}
-        {/* Completed date */}
+            <Pencil className="w-2.5 h-2.5 opacity-50" />
+          </button>
+        ) : !isCompleted ? (
+          <button
+            onClick={openDatePicker}
+            className="flex items-center gap-1 text-foreground-muted/50 hover:text-foreground-muted cursor-pointer rounded-md border border-dashed border-zinc-300 dark:border-zinc-600 px-1.5 py-0.5 hover:border-primary/40 transition-colors"
+            title="Definir data de previsão"
+          >
+            <CalendarDays className="w-3 h-3" />
+            + Prazo
+          </button>
+        ) : null}
         {sprint.endDate && (
           <span className="flex items-center gap-1 text-emerald-500" title="Data de conclusão">
             <Check className="w-3 h-3" />
             {new Date(sprint.endDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-          </span>
-        )}
-        {/* Start date (only when no due/end date shown) */}
-        {!sprint.dueDate && !sprint.endDate && (
-          <span className="flex items-center gap-1">
-            <CalendarDays className="w-3 h-3" />
-            {new Date(sprint.startDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
           </span>
         )}
       </div>
@@ -333,9 +697,10 @@ function SprintRow({ sprint, isActive, onComplete, onRename, onDelete }: {
 
 // ─── Add Sprint Row ───────────────────────────────────
 
-function AddSprintRow({ projectId, onAdd }: {
+function AddSprintRow({ projectId, onAdd, isMobile }: {
   projectId: string;
   onAdd: (projectId: string, data: { name: string; stage: ProjectStage; priority: SprintPriority; startDate: string; dueDate?: string; status: 'active' }) => Promise<void>;
+  isMobile: boolean;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [name, setName] = useState('');
@@ -413,7 +778,7 @@ function AddSprintRow({ projectId, onAdd }: {
       </div>
 
       {/* Row 2: Priority + Due Date */}
-      <div className="flex items-center gap-3 pl-7">
+      <div className={cn('gap-3 pl-7', isMobile ? 'space-y-2' : 'flex items-center')}>
         {/* Priority selector */}
         <div className="flex items-center gap-1">
           <span className="text-[9px] font-semibold uppercase tracking-wider text-foreground-muted mr-1">Prioridade:</span>
@@ -445,8 +810,8 @@ function AddSprintRow({ projectId, onAdd }: {
           })}
         </div>
 
-        {/* Separator */}
-        <div className="h-4 w-px bg-border-subtle" />
+        {/* Separator (desktop only) */}
+        {!isMobile && <div className="h-4 w-px bg-border-subtle" />}
 
         {/* Due date */}
         <div className="flex items-center gap-1.5">

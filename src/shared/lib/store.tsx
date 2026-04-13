@@ -239,7 +239,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             type: 'project',
             status: 'todo',
             priority: 'medium',
-            ownerId: project.ownerId || resolvedUsers[0]?.id || '',
+            ownerId: project.ownerIds?.[0] || resolvedUsers[0]?.id || '',
             tags: [],
             projectId: project.id,
             sprintId: sprint.id,
@@ -400,13 +400,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const deleteLead = useCallback(async (id: string) => {
     try {
+      // Cascade: delete linked projects (sprints cascade via FK), tasks, then the lead
+      const linkedProjects = projects.filter(p => p.leadId === id);
+
+      // Delete tasks linked to this lead or its projects
+      const linkedTaskIds = tasks
+        .filter(t => t.leadId === id || linkedProjects.some(p => p.id === t.projectId))
+        .map(t => t.id);
+      if (linkedTaskIds.length > 0) {
+        await Promise.all(linkedTaskIds.map(tid => api.tasks.delete(tid)));
+      }
+
+      // Delete sprints of linked projects
+      for (const proj of linkedProjects) {
+        for (const sprint of proj.sprints) {
+          await api.sprints.delete(sprint.id);
+        }
+      }
+
+      // Delete linked projects
+      for (const proj of linkedProjects) {
+        await api.projects.delete(proj.id);
+      }
+
+      // Finally delete the lead itself
       await api.leads.delete(id);
-      await refreshLeads();
+      await refreshAll();
     } catch (err) {
-      console.error('[Store] deleteLead failed:', err);
+      console.error('[Store] deleteLead cascade failed:', err);
       throw err;
     }
-  }, [refreshLeads]);
+  }, [refreshAll, projects, tasks]);
 
   const createTask = useCallback(async (data: Parameters<typeof api.tasks.create>[0]) => {
     try {
@@ -461,7 +485,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       type: 'project',
       status: 'in_progress',
       priority: data.priority ?? 'medium',
-      ownerId: project?.ownerId || users[0]?.id || '',
+      ownerId: project?.ownerIds?.[0] || users[0]?.id || '',
       tags: [],
       projectId,
       sprintId: sprint.id,
@@ -567,6 +591,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clientContact: lead.contact,  // Stored for DB queries; UI overrides from lead
       type: projectType,
       status: 'active',
+      ownerIds: lead.ownerId ? [lead.ownerId] : [],
       leadId: lead.id,
     });
 

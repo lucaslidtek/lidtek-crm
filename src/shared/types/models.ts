@@ -113,7 +113,7 @@ export interface Project {
   clientPhone?: string;
   type: ProjectType;
   status: ProjectStatus;
-  ownerId?: string;
+  ownerIds: string[];
   currentSprintId?: string;
   sprints: Sprint[];
   taskIds: string[];

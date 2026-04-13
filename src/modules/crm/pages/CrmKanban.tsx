@@ -8,21 +8,27 @@ import { LeadCreateDialog } from '@/modules/crm/components/LeadCreateDialog';
 import { ColumnManagerDialog } from '@/modules/crm/components/ColumnManagerDialog';
 import { useLeads } from '@/modules/crm/hooks/useLeads';
 import { usePermissions } from '@/shared/hooks/usePermissions';
+import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import { Button } from '@/shared/components/ui/Button';
 import { ViewToggle, type ViewType } from '@/shared/components/ui/ViewToggle';
 import { LeadListView } from '@/modules/crm/components/LeadListView';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
+import { cn } from '@/shared/utils/cn';
 import type { Lead, FunnelColumn } from '@/shared/types/models';
 
 export function CrmKanban() {
   const { leads, leadsByStage, moveLead } = useLeads();
   const { funnelColumns, reorderLeads, createFunnelColumn, updateFunnelColumn, deleteFunnelColumn } = useStore();
   const { canEditAll } = usePermissions();
+  const isMobile = useIsMobile();
 
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [view, setView] = useState<ViewType>('kanban');
   const [search, setSearch] = useState('');
+
+  // Mobile: selected stage tab
+  const [mobileStage, setMobileStage] = useState<string>('all');
 
   // Column manager state
   const [columnDialogOpen, setColumnDialogOpen] = useState(false);
@@ -103,6 +109,12 @@ export function CrmKanban() {
     );
   }, [leadsByStage, search]);
 
+  // Mobile: filtered leads by selected stage
+  const mobileFilteredLeads = useMemo(() => {
+    if (mobileStage === 'all') return filteredLeads;
+    return filteredLeadsByStage[mobileStage] ?? [];
+  }, [mobileStage, filteredLeads, filteredLeadsByStage]);
+
   const n = filteredLeads.length;
 
   return (
@@ -115,21 +127,86 @@ export function CrmKanban() {
           searchPlaceholder={search ? `${n} lead${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}` : `Buscar entre ${leads.length} leads...`}
           actions={
             <>
-              <ViewToggle view={view} onChange={setView} views={['kanban', 'list']} />
+              {!isMobile && <ViewToggle view={view} onChange={setView} views={['kanban', 'list']} />}
               <Button onClick={() => setCreateOpen(true)} size="sm">
                 <Plus className="w-4 h-4" />
-                Novo Lead
+                {isMobile ? 'Novo' : 'Novo Lead'}
               </Button>
             </>
           }
         />
       </div>
 
-      {/* Content: Main + Detail Panel side by side */}
-      <div className="flex flex-1 min-h-0 gap-4">
-        {/* Main content — container with rounded corners */}
-        <div className="flex-1 min-w-0 overflow-hidden h-full rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40">
-          {view === 'kanban' ? (
+      {/* Mobile: Stage tabs */}
+      {isMobile && (
+        <div className="flex-shrink-0 -mx-1 mb-3 overflow-x-auto hide-scrollbar">
+          <div className="flex items-center gap-1.5 px-1 min-w-max">
+            <button
+              onClick={() => setMobileStage('all')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all press-scale whitespace-nowrap',
+                mobileStage === 'all'
+                  ? 'bg-primary/15 text-primary'
+                  : 'bg-zinc-100 dark:bg-zinc-800 text-foreground-muted',
+              )}
+            >
+              Todos
+              <span className="text-[10px] opacity-70">{filteredLeads.length}</span>
+            </button>
+            {funnelColumns.map((col) => {
+              const count = filteredLeadsByStage[col.id]?.length ?? 0;
+              return (
+                <button
+                  key={col.id}
+                  onClick={() => setMobileStage(col.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all press-scale whitespace-nowrap',
+                    mobileStage === col.id
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-foreground-muted',
+                  )}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: col.color }}
+                  />
+                  {col.label}
+                  <span className="text-[10px] opacity-70">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Content: Main + Detail Panel side by side (desktop only) */}
+      <div className={cn('flex flex-1 min-h-0', !isMobile && 'gap-4')}>
+        {/* Main content */}
+        <div className={cn(
+          'flex-1 min-w-0 overflow-hidden h-full',
+          !isMobile && 'rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40',
+        )}>
+          {isMobile ? (
+            /* ── Mobile: card list filtered by stage ── */
+            <div className="h-full overflow-y-auto space-y-2">
+              {mobileFilteredLeads.length > 0 ? (
+                mobileFilteredLeads.map((lead) => (
+                  <button
+                    key={lead.id}
+                    onClick={() => setSelectedLeadId(lead.id)}
+                    className="w-full text-left glass rounded-lg p-3 press-scale transition-all"
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <LeadCard lead={lead} />
+                  </button>
+                ))
+              ) : (
+                <div className="flex items-center justify-center h-32 text-foreground-muted text-sm">
+                  Nenhum lead encontrado
+                </div>
+              )}
+            </div>
+          ) : view === 'kanban' ? (
             <KanbanBoard<Lead>
               columns={kanbanColumns}
               items={filteredLeadsByStage}
@@ -149,7 +226,7 @@ export function CrmKanban() {
           )}
         </div>
 
-        {/* Detail Side Panel — inline, beside content */}
+        {/* Detail Side Panel — inline on desktop, portal on mobile */}
         <LeadDetailDrawer
           lead={selectedLead}
           onClose={() => setSelectedLeadId(null)}
@@ -176,3 +253,4 @@ export function CrmKanban() {
     </div>
   );
 }
+

@@ -349,15 +349,118 @@ Mouse follow: w-600px h-600px bg-primary/20 blur-[120px] mix-blend-screen (deskt
 
 O sistema implementa uma interface híbrida para suportar visão nativa em dispositivos móveis (App-like feel).
 
-### Navegação (Mobile)
-- **Bottom Navigation**: Substitui a Sidebar convencional. Elemento *fixed* na parte inferior.
-- **TopBar (Mobile Header)**: Ganha comportamento de *App Bar* com botão "Voltar" (contextual) na esquerda, Título dinâmico no meio, e Botões de ação à direita. 
-- **Ocultação**: Sidebar é exclusividade de viewports `md` (desktop e tablets horizontais). Em celular, a Sidebar não é renderizada (`hidden md:flex`).
+### 11.1 Detecção Mobile
 
-### Safe Areas (Notch & Home Indicator)
-Todos os elementos de navegação móvel DEVEM respeitar o Safe Area nativo usando variáveis CSS de ambiente nativas (`env()`):
-- **Header**: Utilização de `pt-[max(env(safe-area-inset-top),0px)]` na TopBar.
-- **Bottom Navigation**: Utilização de `pb-[max(calc(env(safe-area-inset-bottom)+0.5rem),0.5rem)]`.
+```typescript
+// useIsMobile() — breakpoint: 640px (sm)
+const isMobile = useIsMobile();
+```
+
+Usado em: `CrmKanban`, `TasksKanban`, `ProjectsPage`, `TeamPage`, `Dashboard`, `ProjectListView`, `PageLayout`, `MobileDrawerWrapper`.
+
+### 11.2 Navegação
+
+| Elemento | Mobile | Desktop |
+|---|---|---|
+| **Sidebar** | Hidden (`hidden md:flex`) | Fixa à esquerda |
+| **BottomNavigation** | Tab bar fixa (`z-50`), 5 itens com touch targets ≥ 48px | Hidden |
+| **PageHeader** | Stacking vertical, botões menores | Horizontal |
+
+### 11.3 Bottom Sheet (MobileDrawerWrapper)
+
+O `MobileDrawerWrapper` renderiza detail drawers de forma responsiva:
+
+```
+Desktop → motion.aside inline (largura animada, ao lado do conteúdo)
+Mobile  → createPortal(bottom sheet, document.body)
+```
+
+**Specs do Bottom Sheet:**
+
+| Propriedade | Valor |
+|---|---|
+| **Altura** | `h-[92vh] max-h-[92vh]` |
+| **Z-index** | `z-[60]` (acima do BottomNavigation z-50) |
+| **Overlay** | `bg-black/50 backdrop-blur-sm` |
+| **Radius** | `rounded-t-2xl` |
+| **Animação** | Slide-up: `y: 100% → 0`, easing `[0.16, 1, 0.3, 1]`, 350ms |
+| **Drag handle** | `.drag-handle` centralizado (32×4px, rounded, bg-zinc-300) |
+| **Scroll** | `overflow-y-auto overscroll-contain safe-bottom` |
+
+> **⚠️ Portal obrigatório:** Sem portal, `position: fixed` dentro de `<motion.main>` (que tem `transform`) fica preso ao stacking context do ancestral. Ver `ARCHITECTURE.md §4.6`.
+
+### 11.4 Containers Responsivos
+
+Nas páginas de lista (CRM, Projects, Tasks, Team), o container visual é **condicional**:
+
+| Viewport | Container |
+|---|---|
+| **Desktop** | `rounded-xl bg-zinc-50/50 border border-zinc-200/60` |
+| **Mobile** | Sem container — cards full-bleed, sem ruído visual |
+
+```typescript
+<div className={cn(
+  'flex-1 min-w-0 overflow-hidden h-full',
+  !isMobile && 'rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border ...',
+)}>
+```
+
+### 11.5 Cards Mobile — TaskCard
+
+O `TaskCard` tem layout otimizado para mobile:
+
+| Elemento | Desktop | Mobile |
+|---|---|---|
+| **Entidade vinculada** | Chip colorido no topo | Idem — ícone + nome (Briefcase=projeto, User=lead) |
+| **Título** | `line-clamp-2` | `line-clamp-3` + `pr-14` (evita colisão com botões) |
+| **Botões editar/excluir** | Hover only | **Sempre visíveis** (`opacity-100 sm:opacity-0`) |
+| **Touch target dos botões** | 24px | 28px (`w-7 h-7`) + `press-scale` |
+| **Footer** | Sem separador | `border-t border-border-subtle/50` |
+| **Texto** | `10px` | `11px` — legibilidade mobile |
+
+**Chip de entidade vinculada:**
+```
+Projeto → bg-blue-50 text-blue-600 + Briefcase icon
+Lead    → bg-emerald-50 text-emerald-600 + User icon
+```
+
+### 11.6 Cards Mobile — ProjectListView
+
+O item de projeto tem **dois layouts distintos**:
+
+**Desktop:** Linha horizontal com 6 elementos (chevron, ícone, nome, badge, sprint, counter, owner).
+
+**Mobile:** Layout empilhado em 2 linhas:
+- **Linha 1:** ícone + nome do cliente (`line-clamp-2`) + type badge + chevron expand
+- **Linha 2:** sprint ativa (`line-clamp-2`, sem truncate) + sprint counter + owner avatar
+
+**SprintRow Mobile:**
+- **Linha 1:** checkbox + nome da sprint (sem truncate, wrap natural) + botão delete (sempre visível)
+- **Linha 2:** badges (ativa, prioridade, estágio) + data — com `flex-wrap`
+- **Edição:** Tap para editar (em vez de double-click)
+
+### 11.7 Safe Areas (Notch & Home Indicator)
+
+```html
+<!-- index.html -->
+<meta name="viewport" content="..., viewport-fit=cover">
+```
+
+```css
+/* globals.css */
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+```
+
+Elementos que usam `safe-bottom`: `BottomNavigation`, `MobileDrawerWrapper` (sheet content).
+
+### 11.8 Utilities Mobile
+
+| Classe CSS | Uso | Definição |
+|---|---|---|
+| `.press-scale` | Feedback tátil em buttons/cards | `active:scale-[0.97] transition-transform` |
+| `.safe-bottom` | Padding para Home Indicator iOS | `padding-bottom: env(safe-area-inset-bottom)` |
+| `.drag-handle` | Handle visual de bottom sheet | `w-8 h-1 rounded-full bg-zinc-300` |
+| `.hide-scrollbar` | Tab bars horizontais | Oculta scrollbar nativa mantendo scroll |
 
 ---
 
@@ -373,3 +476,8 @@ Todos os elementos de navegação móvel DEVEM respeitar o Safe Area nativo usan
 8. **Hierarquia visual via opacidade** — não via tamanho excessivo
 9. **Mobile-first** — efeitos complexos apenas em `md:` ou `lg:`
 10. **Consistência > criatividade** — usar tokens, nunca valores hardcoded
+11. **Portal para overlays mobile** — sempre usar `createPortal` para bottom sheets
+12. **Touch targets ≥ 44px** — botões e áreas clicáveis no mobile
+13. **Sem container visual no mobile** — cards full-bleed, limpo
+14. **Entidades vinculadas sempre visíveis** — chip colorido com ícone, não texto muted
+

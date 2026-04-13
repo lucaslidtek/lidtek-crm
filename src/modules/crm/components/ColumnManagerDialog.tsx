@@ -174,7 +174,7 @@ export function ColumnManagerDialog({
                         )}
                         style={{
                           backgroundColor: c,
-                          ringColor: c,
+                          ['--tw-ring-color' as string]: c,
                         }}
                       >
                         {color === c && (

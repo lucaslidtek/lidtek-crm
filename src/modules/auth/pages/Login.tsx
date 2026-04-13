@@ -57,13 +57,13 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden px-4 sm:px-0">
       {/* Decorative glows */}
       <div className="absolute -top-[400px] -right-[300px] w-[700px] h-[700px] rounded-full bg-primary/6 blur-[150px] pointer-events-none" />
       <div className="absolute -bottom-[300px] -left-[200px] w-[500px] h-[500px] rounded-full bg-blue-light/4 blur-[120px] pointer-events-none" />
 
       <motion.div
-        className="glass rounded-xl p-10 w-full max-w-sm text-center relative z-10"
+        className="glass rounded-xl p-8 sm:p-10 w-full max-w-sm text-center relative z-10"
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -117,7 +117,7 @@ export function Login() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30 transition-all"
+            className="w-full px-4 py-3 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30 transition-all"
           />
           <input
             id="login-password"
@@ -125,7 +125,7 @@ export function Login() {
             placeholder="Senha"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30 transition-all"
+            className="w-full px-4 py-3 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30 transition-all"
           />
           {emailError && (
             <p className="text-xs text-red-500 text-left">{emailError}</p>
@@ -134,7 +134,7 @@ export function Login() {
             id="login-submit"
             type="submit"
             disabled={emailLoading || !email.trim() || !password.trim()}
-            className="w-full py-2.5 rounded-lg bg-primary text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-3 rounded-lg bg-primary text-white font-medium text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed press-scale"
           >
             {emailLoading ? 'Entrando...' : 'Entrar'}
           </button>
@@ -151,7 +151,7 @@ export function Login() {
         <button
           onClick={handleLogin}
           disabled={loginPending || isLoading}
-          className="w-full flex items-center justify-center gap-3 px-6 py-3 rounded-lg bg-white dark:bg-white text-gray-800 font-medium text-sm shadow-sm hover:shadow-lg hover:shadow-black/5 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer border border-gray-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+          className="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-lg bg-white dark:bg-white text-gray-800 font-medium text-sm shadow-sm hover:shadow-lg hover:shadow-black/5 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer border border-gray-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 press-scale"
         >
           {loginPending ? (
             <>
