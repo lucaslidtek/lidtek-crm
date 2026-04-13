@@ -11,6 +11,7 @@ import {
   Briefcase, Target, ChevronRight, Plus,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import { LeadCreateDialog } from '@/modules/crm/components/LeadCreateDialog';
 import { TaskCreateDialog } from '@/modules/tasks/components/TaskCreateDialog';
@@ -107,9 +108,9 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* ═══════ Mobile FAB ═══════ */}
-      {isMobile && (
-        <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end gap-2">
+      {/* ═══════ Mobile FAB (portal to escape motion.main transform) ═══════ */}
+      {isMobile && createPortal(
+        <div className="fixed right-4 z-40 flex flex-col items-end gap-2 bottom-[calc(env(safe-area-inset-bottom,0px)+5.5rem)]">
           {fabOpen && (
             <>
               <button
@@ -140,7 +141,8 @@ export function Dashboard() {
           >
             <Plus className="w-6 h-6" />
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* ═══════ KPI Strip ═══════ */}
