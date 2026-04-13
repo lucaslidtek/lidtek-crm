@@ -1,11 +1,12 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { useEffect, useState } from 'react';
 
 export function Login() {
   const { login, loginWithPassword, isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const [loginPending, setLoginPending] = useState(false);
 
   // Email/password state
@@ -14,12 +15,30 @@ export function Login() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailLoading, setEmailLoading] = useState(false);
 
+  // Access denied feedback from redirect
+  const [accessDeniedMsg, setAccessDeniedMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get('denied') === '1') {
+      const deniedEmail = params.get('email');
+      setAccessDeniedMsg(
+        deniedEmail
+          ? `O email ${deniedEmail} não tem permissão de acesso ao sistema.`
+          : 'Sua conta não tem permissão de acesso ao sistema.'
+      );
+      // Clean URL without reload
+      window.history.replaceState({}, '', '/login');
+    }
+  }, [search]);
+
   useEffect(() => {
     if (isAuthenticated) setLocation('/');
   }, [isAuthenticated, setLocation]);
 
   const handleLogin = () => {
     setLoginPending(true);
+    setAccessDeniedMsg(null);
     login();
   };
 
@@ -27,6 +46,7 @@ export function Login() {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
     setEmailError(null);
+    setAccessDeniedMsg(null);
     setEmailLoading(true);
     const { error } = await loginWithPassword(email.trim(), password);
     if (error) {
@@ -63,6 +83,31 @@ export function Login() {
         <p className="text-foreground-muted text-sm mb-6">
           Sistema de Gestão de Projetos
         </p>
+
+        {/* Access Denied Banner */}
+        <AnimatePresence>
+          {accessDeniedMsg && (
+            <motion.div
+              id="access-denied-banner"
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 20 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
+            >
+              <div className="flex items-start gap-2.5 p-3.5 rounded-lg bg-red-500/10 border border-red-500/20 text-left">
+                <svg className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-red-400 mb-0.5">Acesso negado</p>
+                  <p className="text-[11px] text-red-400/80 leading-relaxed">{accessDeniedMsg}</p>
+                  <p className="text-[10px] text-red-400/50 mt-1">Entre em contato com o administrador para solicitar acesso.</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Email/Password Login Form */}
         <form onSubmit={handleEmailLogin} className="space-y-3 mb-5">

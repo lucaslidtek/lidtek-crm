@@ -12,13 +12,15 @@ function isOAuthCallback(): boolean {
 }
 
 export function PrivateRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading, accessDenied } = useAuth();
+  const { isAuthenticated, isLoading, accessDenied, deniedEmail } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // If user authenticated but isn't in the whitelist, redirect to access-denied
+    // If user authenticated but isn't in the whitelist, redirect to login with error
     if (accessDenied) {
-      setLocation('/access-denied');
+      const params = new URLSearchParams({ denied: '1' });
+      if (deniedEmail) params.set('email', deniedEmail);
+      setLocation(`/login?${params.toString()}`);
       return;
     }
     // NEVER redirect to /login while an OAuth callback is being processed —
@@ -26,7 +28,7 @@ export function PrivateRoute({ children }: { children: ReactNode }) {
     if (!isLoading && !isAuthenticated && !isOAuthCallback()) {
       setLocation('/login');
     }
-  }, [isLoading, isAuthenticated, accessDenied, setLocation]);
+  }, [isLoading, isAuthenticated, accessDenied, deniedEmail, setLocation]);
 
   if (accessDenied) {
     return null;
