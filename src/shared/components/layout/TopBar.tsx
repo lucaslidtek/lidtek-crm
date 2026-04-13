@@ -124,11 +124,20 @@ export function TopBar() {
                 'hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-200'
               )}
             >
-              <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/20">
-                <span className="text-[10px] md:text-xs font-bold text-primary">
-                  {user?.initials ?? '?'}
-                </span>
-              </div>
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name ?? ''}
+                  className="w-7 h-7 md:w-8 md:h-8 rounded-lg object-cover border border-primary/20"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/20">
+                  <span className="text-[10px] md:text-xs font-bold text-primary">
+                    {user?.initials ?? '?'}
+                  </span>
+                </div>
+              )}
               <span className="text-sm font-medium text-foreground hidden md:block">
                 {user?.name?.split(' ')[0] ?? 'Usuário'}
               </span>

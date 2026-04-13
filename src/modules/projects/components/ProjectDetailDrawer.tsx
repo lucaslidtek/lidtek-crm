@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check, Clock, Calendar, Briefcase, Tag, Layers, Trash2, Pencil, CheckCircle2 } from 'lucide-react';
 import { WhatsAppIcon } from '@/shared/components/icons/WhatsAppIcon';
 import { cn } from '@/shared/utils/cn';
@@ -324,13 +325,30 @@ function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
   onSave: (userIds: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const owners = ownerIds.map(id => getUserById(id)).filter(Boolean);
 
+  // Position dropdown under button
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.left });
+    }
+  }, [open]);
+
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        btnRef.current && !btnRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -344,8 +362,9 @@ function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
   };
 
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors flex-wrap"
       >
@@ -353,9 +372,9 @@ function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
           <>
             <div className="flex items-center -space-x-1">
               {owners.map((owner, i) => (
-                <div key={i} className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center border-2 border-white dark:border-zinc-900" title={owner!.name}>
+                <div key={i} className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center border-2 border-white dark:border-zinc-900 overflow-hidden flex-shrink-0" title={owner!.name}>
                   {owner!.avatarUrl ? (
-                    <img src={owner!.avatarUrl} className="w-5 h-5 rounded-full object-cover" alt="" />
+                    <img src={owner!.avatarUrl} className="w-full h-full rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
                   ) : (
                     <span className="text-[7px] font-bold text-primary">{owner!.initials}</span>
                   )}
@@ -371,8 +390,13 @@ function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
         )}
       </button>
 
-      {open && (
-        <div className="absolute top-full left-0 mt-1 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 py-1 max-h-48 overflow-y-auto">
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl py-1 max-h-48 overflow-y-auto z-[9999]"
+          style={{ top: pos.top, left: pos.left }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <p className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">Selecione os responsáveis</p>
           {users.map((u) => {
             const isSelected = ownerIds.includes(u.id);
@@ -391,9 +415,9 @@ function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
                 )}>
                   {isSelected && <Check className="w-2.5 h-2.5" />}
                 </div>
-                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {u.avatarUrl ? (
-                    <img src={u.avatarUrl} className="w-5 h-5 rounded-full object-cover" alt="" />
+                    <img src={u.avatarUrl} className="w-full h-full rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
                   ) : (
                     <span className="text-[8px] font-bold text-primary">{u.initials}</span>
                   )}
@@ -402,9 +426,10 @@ function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
 

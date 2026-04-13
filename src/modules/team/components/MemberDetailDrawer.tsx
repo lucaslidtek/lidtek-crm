@@ -260,6 +260,7 @@ export function MemberDetailDrawer({ member, onClose }: MemberDetailDrawerProps)
                     src={member.avatarUrl}
                     alt={member.name}
                     className="w-12 h-12 rounded-xl object-cover ring-2 ring-white/20 flex-shrink-0"
+                    referrerPolicy="no-referrer"
                   />
                 ) : (
                   <div

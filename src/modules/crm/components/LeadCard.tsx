@@ -67,7 +67,7 @@ export function LeadCard({ lead }: LeadCardProps) {
           <div className="relative" title={owner.name}>
             <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center cursor-default">
               {owner.avatarUrl ? (
-                <img src={owner.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
+                <img src={owner.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
               ) : (
                 <span className="text-[9px] font-bold text-primary">{owner.initials}</span>
               )}

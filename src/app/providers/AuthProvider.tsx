@@ -98,6 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Build a fallback from JWT metadata — always available, no DB needed
     const fallback = authUserToProfile(authUser);
 
+    // Extract Google avatar from OAuth metadata (always fresh)
+    const meta = authUser.user_metadata ?? {};
+    const googleAvatar = meta['avatar_url'] ?? meta['picture'] ?? undefined;
+
     // Check if this user has a profile in the database (whitelist check)
     try {
       const { data: existing, error } = await supabase
@@ -119,13 +123,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (existing) {
         // Profile exists — user is authorized
+        // Always sync Google avatar on login so the photo stays current
+        const storedAvatar: string | undefined = existing.avatar_url ?? undefined;
+        const needsAvatarSync = googleAvatar && googleAvatar !== storedAvatar;
+
+        if (needsAvatarSync) {
+          // Fire-and-forget: update the avatar in the DB
+          supabase
+            .from('profiles')
+            .update({ avatar_url: googleAvatar, updated_at: new Date().toISOString() })
+            .eq('id', authUser.id)
+            .then(({ error: updateErr }) => {
+              if (updateErr) console.warn('[Auth] Failed to sync Google avatar:', updateErr.message);
+              else console.log('[Auth] Google avatar synced successfully');
+            });
+        }
+
         const profile: User = {
           id: existing.id,
           name: existing.name,
           email: existing.email,
           role: existing.role ?? 'collaborator',
           initials: existing.initials,
-          avatarUrl: existing.avatar_url ?? undefined,
+          // Use Google avatar (freshest) if available, else DB value
+          avatarUrl: googleAvatar ?? storedAvatar,
           phone: existing.phone ?? undefined,
           position: existing.position ?? undefined,
           status: existing.status ?? 'active',

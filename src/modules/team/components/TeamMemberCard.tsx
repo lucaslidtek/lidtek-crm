@@ -63,6 +63,7 @@ export function TeamMemberCard({ member, onClick }: TeamMemberCardProps) {
               src={member.avatarUrl}
               alt={member.name}
               className="w-16 h-16 rounded-2xl object-cover ring-2 ring-white/20"
+              referrerPolicy="no-referrer"
             />
           ) : (
             <div

@@ -40,7 +40,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             {owners.slice(0, 3).map((owner, i) => (
               <div key={i} className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center border-2 border-white dark:border-zinc-900 cursor-default" title={owner!.name}>
                 {owner!.avatarUrl ? (
-                  <img src={owner!.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
+                  <img src={owner!.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
                 ) : (
                   <span className="text-[9px] font-bold text-primary">{owner!.initials}</span>
                 )}

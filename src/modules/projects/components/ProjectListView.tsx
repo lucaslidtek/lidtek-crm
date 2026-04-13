@@ -5,9 +5,10 @@ import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import type { Project, Sprint, ProjectStage, SprintPriority } from '@/shared/types/models';
 import { Badge, ProjectTypeBadge } from '@/shared/components/ui/Badge';
 import { PROJECT_STAGES, getStageLabel, getStageColor } from '@/shared/lib/constants';
-import { Briefcase, ChevronDown, Plus, Check, Clock, Circle, CalendarDays, Trash2, ArrowUp, ArrowRight, ArrowDown, Pencil } from 'lucide-react';
+import { Briefcase, ChevronDown, Plus, Check, Clock, Circle, CalendarDays, Trash2, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DatePicker } from '@/shared/components/ui/DatePicker';
 
 interface ProjectListViewProps {
   projects: Project[];
@@ -279,10 +280,8 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile 
   const PriorityIcon = priorityCfg.icon;
   const [completing, setCompleting] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [editingDate, setEditingDate] = useState(false);
   const [draft, setDraft] = useState(sprint.name);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dateRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (editing) {
@@ -290,13 +289,6 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile 
       inputRef.current?.select();
     }
   }, [editing]);
-
-  useEffect(() => {
-    if (editingDate) {
-      dateRef.current?.showPicker?.();
-      dateRef.current?.focus();
-    }
-  }, [editingDate]);
 
   const handleComplete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -390,16 +382,8 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile 
     document.body
   ) : null;
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
+  const handleDateChange = (val: string | undefined) => {
     onUpdate({ dueDate: val || undefined });
-    setEditingDate(false);
-  };
-
-  const openDatePicker = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isCompleted) return;
-    setEditingDate(true);
   };
 
   if (isMobile) {
@@ -498,42 +482,16 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile 
             {priorityPopover}
           </div>
           <Badge color={stageColor}>{stageLabel}</Badge>
-          {/* Due date — tap to edit */}
-          {editingDate ? (
-            <input
-              ref={dateRef}
-              type="date"
-              defaultValue={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : ''}
+          {/* Due date — custom DatePicker */}
+          {!isCompleted && (
+            <DatePicker
+              value={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : undefined}
               onChange={handleDateChange}
-              onBlur={() => setEditingDate(false)}
-              className="text-[10px] bg-transparent border border-border-subtle rounded px-1.5 py-0.5 text-foreground outline-none focus:ring-1 focus:ring-primary/30"
-              onClick={(e) => e.stopPropagation()}
+              disabled={isCompleted}
+              variant={sprint.dueDate && new Date(sprint.dueDate) < new Date() ? 'badge-overdue' : sprint.dueDate ? 'badge-upcoming' : 'compact'}
+              placeholder="+ Prazo"
             />
-          ) : sprint.dueDate && !isCompleted ? (
-            <button
-              onClick={openDatePicker}
-              className={cn(
-                'flex items-center gap-1 text-[10px] cursor-pointer rounded-md px-1.5 py-0.5 border transition-colors',
-                new Date(sprint.dueDate) < new Date()
-                  ? 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 font-semibold'
-                  : 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30',
-              )}
-              title="Clique para alterar data"
-            >
-              <CalendarDays className="w-3 h-3" />
-              {new Date(sprint.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-              <Pencil className="w-2.5 h-2.5 opacity-50" />
-            </button>
-          ) : !isCompleted ? (
-            <button
-              onClick={openDatePicker}
-              className="flex items-center gap-1 text-[10px] text-foreground-muted/50 hover:text-foreground-muted cursor-pointer rounded-md border border-dashed border-zinc-300 dark:border-zinc-600 px-1.5 py-0.5 hover:border-primary/40 transition-colors"
-              title="Definir data de previsão"
-            >
-              <CalendarDays className="w-3 h-3" />
-              + Prazo
-            </button>
-          ) : null}
+          )}
           {sprint.endDate && (
             <span className="flex items-center gap-1 text-[10px] text-emerald-500">
               <Check className="w-3 h-3" />
@@ -639,41 +597,15 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile 
 
       {/* Dates */}
       <div className="flex items-center gap-3 text-[10px] text-foreground-muted flex-shrink-0">
-        {editingDate ? (
-          <input
-            ref={dateRef}
-            type="date"
-            defaultValue={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : ''}
+        {!isCompleted && (
+          <DatePicker
+            value={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : undefined}
             onChange={handleDateChange}
-            onBlur={() => setEditingDate(false)}
-            className="text-xs bg-transparent border border-border-subtle rounded-md px-2 py-1 text-foreground outline-none focus:ring-1 focus:ring-primary/30"
-            onClick={(e) => e.stopPropagation()}
+            disabled={isCompleted}
+            variant={sprint.dueDate && new Date(sprint.dueDate) < new Date() ? 'badge-overdue' : sprint.dueDate ? 'badge-upcoming' : 'compact'}
+            placeholder="+ Prazo"
           />
-        ) : sprint.dueDate && !isCompleted ? (
-          <button
-            onClick={openDatePicker}
-            className={cn(
-              'flex items-center gap-1 cursor-pointer rounded-md px-1.5 py-0.5 border transition-colors',
-              new Date(sprint.dueDate) < new Date()
-                ? 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 font-semibold'
-                : 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30',
-            )}
-            title="Clique para alterar data"
-          >
-            <CalendarDays className="w-3 h-3" />
-            {new Date(sprint.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-            <Pencil className="w-2.5 h-2.5 opacity-50" />
-          </button>
-        ) : !isCompleted ? (
-          <button
-            onClick={openDatePicker}
-            className="flex items-center gap-1 text-foreground-muted/50 hover:text-foreground-muted cursor-pointer rounded-md border border-dashed border-zinc-300 dark:border-zinc-600 px-1.5 py-0.5 hover:border-primary/40 transition-colors"
-            title="Definir data de previsão"
-          >
-            <CalendarDays className="w-3 h-3" />
-            + Prazo
-          </button>
-        ) : null}
+        )}
         {sprint.endDate && (
           <span className="flex items-center gap-1 text-emerald-500" title="Data de conclusão">
             <Check className="w-3 h-3" />
@@ -813,16 +745,15 @@ function AddSprintRow({ projectId, onAdd, isMobile }: {
         {/* Separator (desktop only) */}
         {!isMobile && <div className="h-4 w-px bg-border-subtle" />}
 
-        {/* Due date */}
+        {/* Due date — custom DatePicker */}
         <div className="flex items-center gap-1.5">
           <CalendarDays className="w-3.5 h-3.5 text-foreground-muted" />
           <span className="text-[9px] font-semibold uppercase tracking-wider text-foreground-muted">Previsão:</span>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="text-xs bg-transparent border border-border-subtle rounded-md px-2 py-1 text-foreground outline-none focus:ring-1 focus:ring-primary/30 transition-colors cursor-pointer"
+          <DatePicker
+            value={dueDate || undefined}
+            onChange={(v) => setDueDate(v || '')}
             disabled={saving}
+            placeholder="+ Prazo"
           />
         </div>
       </div>
