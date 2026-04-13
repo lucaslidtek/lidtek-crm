@@ -220,18 +220,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // ── Cold start (first login or after logout) ──
     // No cache — must call getSession() to exchange PKCE code or restore session.
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return;
-      if (session?.user) {
-        await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-      } else {
-        setUser(null);
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-      }
-      resolveLoading();
-    }).catch(() => {
-      if (mounted) resolveLoading();
-    });
+
+    // R2 defensive: try PKCE code exchange first if present in URL
+    const urlCode = new URLSearchParams(window.location.search).get('code');
+    if (urlCode) {
+      supabase.auth.exchangeCodeForSession(urlCode).then(async ({ data, error }) => {
+        if (!mounted) return;
+        if (!error && data.session?.user) {
+          await loadProfile(data.session.user as Parameters<typeof loadProfile>[0]);
+          resolveLoading();
+          // Clean the URL after successful exchange
+          window.history.replaceState({}, '', window.location.pathname);
+        } else {
+          // PKCE exchange failed — fallback to getSession
+          fallbackGetSession();
+        }
+      }).catch(() => {
+        // PKCE exchange error — fallback to getSession
+        if (mounted) fallbackGetSession();
+      });
+    } else {
+      fallbackGetSession();
+    }
+
+    function fallbackGetSession() {
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (!mounted) return;
+        if (session?.user) {
+          await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+        } else {
+          setUser(null);
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+        resolveLoading();
+      }).catch(() => {
+        if (mounted) resolveLoading();
+      });
+    }
 
     // ---- Step 2: onAuthStateChange ----
     // Handles SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED after the initial load.

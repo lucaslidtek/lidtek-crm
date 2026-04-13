@@ -2,17 +2,28 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { useLocation } from 'wouter';
 import { type ReactNode, useEffect } from 'react';
 
+/** Check if the current URL contains OAuth callback tokens (implicit or PKCE). */
+function isOAuthCallback(): boolean {
+  // Implicit flow: hash contains access_token
+  if (window.location.hash.includes('access_token=')) return true;
+  // PKCE flow: query contains code
+  if (new URLSearchParams(window.location.search).has('code')) return true;
+  return false;
+}
+
 export function PrivateRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // NEVER redirect to /login while an OAuth callback is being processed —
+    // the AuthProvider needs time to exchange the token / process the hash.
+    if (!isLoading && !isAuthenticated && !isOAuthCallback()) {
       setLocation('/login');
     }
   }, [isLoading, isAuthenticated, setLocation]);
 
-  if (isLoading) {
+  if (isLoading || isOAuthCallback()) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
         <svg className="animate-spin h-8 w-8 text-primary mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

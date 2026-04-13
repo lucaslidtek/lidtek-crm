@@ -29,6 +29,8 @@ if (!globalThis.__supabaseClient) {
       storageKey: 'sb-lidtek-auth',
       // Persist session across reloads
       persistSession: true,
+      // Auto-refresh JWT before it expires — MUST be explicit (R2)
+      autoRefreshToken: true,
       // Detect session from URL for OAuth callbacks
       detectSessionInUrl: true,
       // Disable the lock that causes "Lock was not released within 5000ms"
