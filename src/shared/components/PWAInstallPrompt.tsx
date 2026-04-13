@@ -3,18 +3,29 @@ import { Download, X } from 'lucide-react';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
+const STORAGE_KEY = 'crm-pwa-prompt-seen';
+
 export function PWAInstallPrompt() {
   const { isInstallable, install, dismiss } = usePWAInstall();
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(() => {
+    try { return localStorage.getItem(STORAGE_KEY) === '1'; }
+    catch { return false; }
+  });
 
   if (!isInstallable || isDismissed) return null;
 
+  const markSeen = () => {
+    try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+    setIsDismissed(true);
+  };
+
   const handleInstall = async () => {
     await install();
+    markSeen();
   };
 
   const handleDismiss = () => {
-    setIsDismissed(true);
+    markSeen();
     dismiss();
   };
 
