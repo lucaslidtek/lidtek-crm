@@ -33,7 +33,7 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
   const { getUserById, updateLead, deleteLead, convertLeadToProject, projects, tasks, users, funnelColumns, moveLeadStage, createTask } = useStore();
   const [, setLocation] = useLocation();
   const [converting, setConverting] = useState<boolean>(false);
-  const [selectedType, setSelectedType] = useState<ProjectType>('oneshot');
+
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
@@ -62,11 +62,15 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
   // Tasks linked to this lead
   const linkedTasks = lead ? tasks.filter(t => t.leadId === lead.id) : [];
 
+  // Derive project type from lead's billingType (set during funnel)
+  const derivedProjectType: ProjectType = lead?.billingType === 'recurring' ? 'recurring' : 'oneshot';
+  const derivedTypeLabel = derivedProjectType === 'recurring' ? 'Recorrente' : 'Único';
+
   const handleConvert = async () => {
     if (!lead) return;
     setConverting(true);
     try {
-      await convertLeadToProject(lead.id, selectedType);
+      await convertLeadToProject(lead.id, derivedProjectType);
       onClose();
       setLocation('/projects');
     } catch (err) {
@@ -432,25 +436,14 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
               {canConvert && (
                 <Section title="Converter" icon={<ArrowRight className="w-3.5 h-3.5" />}>
                   <div className="space-y-2">
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => setSelectedType('recurring')}
-                        className={cn(
-                          'flex-1 px-2 py-1.5 rounded-md text-[10px] font-semibold transition-all border cursor-pointer',
-                          selectedType === 'recurring'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                            : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800',
-                        )}
-                      >Recorrente</button>
-                      <button
-                        onClick={() => setSelectedType('oneshot')}
-                        className={cn(
-                          'flex-1 px-2 py-1.5 rounded-md text-[10px] font-semibold transition-all border cursor-pointer',
-                          selectedType === 'oneshot'
-                            ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
-                            : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800',
-                        )}
-                      >Único</button>
+                    <div className={cn(
+                      'flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[10px] font-semibold border',
+                      derivedProjectType === 'recurring'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400',
+                    )}>
+                      <Briefcase className="w-3 h-3" />
+                      <span>Projeto {derivedTypeLabel}</span>
                     </div>
                     <Button size="sm" onClick={handleConvert} disabled={converting} className="w-full">
                       {converting ? 'Convertendo...' : 'Criar Projeto'}
