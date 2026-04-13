@@ -39,9 +39,8 @@ export function BottomNavigation() {
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50',
         'glass flex items-center justify-around',
-        // Padding condicional para suportar "notch" do iOS no aparelho
-        'pt-1 pb-[max(calc(env(safe-area-inset-bottom)+0.25rem),0.5rem)]',
-        'border-t border-border-subtle md:hidden' // Esconde no desktop
+        'pt-2.5 pb-[max(calc(env(safe-area-inset-bottom)+0.75rem),0.75rem)]',
+        'border-t border-border-subtle md:hidden'
       )}
     >
       {visibleItems.map((item) => {
