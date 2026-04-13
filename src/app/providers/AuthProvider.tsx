@@ -298,10 +298,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
+    // ── Visibility change: re-validate session when user returns to tab ──
+    // When the browser tab is in background, timers are frozen and
+    // autoRefreshToken can't run. The JWT may expire silently.
+    // On return, we force a network check with getUser() to either
+    // refresh the token or detect that the session died.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible' || !mounted) return;
+      // Only re-validate if we think we're authenticated
+      const cached = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (!cached) return;
+
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!mounted) return;
+        if (user) {
+          // Session is still alive — reload profile in case token was refreshed
+          loadProfile(user as Parameters<typeof loadProfile>[0]);
+        } else {
+          // Session died while tab was hidden — clean up
+          setUser(null);
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       mounted = false;
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [loadProfile, resolveLoading]);
 

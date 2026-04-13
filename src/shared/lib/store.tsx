@@ -297,6 +297,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [isAuthenticated, authLoading, refreshAll]);
 
+  // ─── Visibility change: re-fetch data when returning to tab ───
+  // When the user returns from a backgrounded tab, the auth token may have
+  // been refreshed by the AuthProvider's visibilitychange handler. We
+  // silently re-fetch all data to ensure the UI shows fresh state.
+  // This runs WITHOUT setting loading=true to avoid a flash of loading UI.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!isAuthenticated || authLoading) return;
+
+      // Silent refresh — don't show loading spinner, just update data
+      Promise.all([
+        api.users.list(),
+        api.leads.list(),
+        api.projects.list(),
+        api.tasks.list(),
+        api.funnelColumns.list(),
+      ]).then(([u, l, p, t, fc]) => {
+        // Apply zombie-session guard here too
+        const allEmpty = u.length === 0 && l.length === 0 && p.length === 0 && t.length === 0 && fc.length === 0;
+        if (allEmpty && _cache && (_cache.leads.length > 0 || _cache.projects.length > 0 || _cache.users.length > 0 || _cache.tasks.length > 0)) {
+          console.warn('[Store] Visibility refresh returned all empty — preserving cache');
+          return;
+        }
+
+        const resolvedColumns = fc.length > 0 ? fc : DEFAULT_FUNNEL_COLUMNS;
+        const enrichedProjects = enrichProjectsWithLeads(p, l);
+        setUsers(u);
+        setLeads(l);
+        setProjects(enrichedProjects);
+        setTasks(t);
+        setFunnelColumns(resolvedColumns);
+        _cache = { leads: l, projects: enrichedProjects, tasks: t, users: u, funnelColumns: resolvedColumns };
+      }).catch(err => {
+        console.warn('[Store] Visibility refresh failed — preserving existing state:', err);
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isAuthenticated, authLoading, enrichProjectsWithLeads]);
+
   const createFunnelColumn = useCallback(async (data: { label: string; color: string }) => {
     const col = await api.funnelColumns.create(data);
     await refreshFunnelColumns();
