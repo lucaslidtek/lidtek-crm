@@ -6,6 +6,24 @@ import { supabase } from '@/shared/lib/supabase';
 // Same interface as mockApi.ts — drop-in replacement
 // ============================================
 
+// --- RLS error detection helper ---
+function formatSupabaseError(operation: string, error: { message: string; code?: string; details?: string; hint?: string }): string {
+  const msg = error.message?.toLowerCase() ?? '';
+  const code = error.code ?? '';
+  // RLS/permission errors
+  if (msg.includes('row_level_security') || msg.includes('row-level security')
+    || code === '42501'
+    || msg.includes('new row violates row-level security')
+    || msg.includes('policy')) {
+    return `${operation}: Permissão negada. Verifique se seu perfil tem a role correta (admin/gestor). Detalhes: ${error.message}`;
+  }
+  // No rows returned after write — likely RLS blocking the SELECT after INSERT/UPDATE
+  if (msg.includes('0 rows') || msg.includes('no rows') || msg.includes('json object requested, multiple (or no) rows returned')) {
+    return `${operation}: Operação não retornou dados. Possível bloqueio de RLS — verifique as políticas de acesso no Supabase.`;
+  }
+  return `${operation}: ${error.message}`;
+}
+
 
 // --- Row → Model mappers ---
 
@@ -203,7 +221,7 @@ export const api = {
         .from('profiles')
         .select('*')
         .order('name');
-      if (error) throw new Error(`users.list: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('users.list', error));
       return (data ?? []).map(rowToUser);
     },
 
@@ -244,7 +262,7 @@ export const api = {
         })
         .select()
         .single();
-      if (error) throw new Error(`users.create: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('users.create', error));
       return rowToUser(data);
     },
 
@@ -255,7 +273,7 @@ export const api = {
         .eq('id', id)
         .select()
         .single();
-      if (error) throw new Error(`users.update: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('users.update', error));
       return rowToUser(data);
     },
 
@@ -264,7 +282,7 @@ export const api = {
         .from('profiles')
         .delete()
         .eq('id', id);
-      if (error) throw new Error(`users.delete: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('users.delete', error));
       return true;
     },
   },
@@ -276,7 +294,7 @@ export const api = {
         .from('leads')
         .select('*, interactions(*)')
         .order('created_at', { ascending: false });
-      if (error) throw new Error(`leads.list: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('leads.list', error));
 
       // Fetch task IDs per lead
       const { data: tasks } = await supabase
@@ -340,7 +358,7 @@ export const api = {
         })
         .select('*, interactions(*)')
         .single();
-      if (error) throw new Error(`leads.create: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('leads.create', error));
       return rowToLead(data, []);
     },
 
@@ -351,7 +369,7 @@ export const api = {
         .eq('id', id)
         .select('*, interactions(*)')
         .single();
-      if (error) throw new Error(`leads.update: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('leads.update', error));
 
       const { data: tasks } = await supabase
         .from('tasks')
@@ -370,7 +388,7 @@ export const api = {
         .from('leads')
         .delete()
         .eq('id', id);
-      if (error) throw new Error(`leads.delete: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('leads.delete', error));
       return true;
     },
   },
@@ -382,7 +400,7 @@ export const api = {
         .from('projects')
         .select('*, sprints!sprints_project_id_fkey(*)')
         .order('created_at', { ascending: false });
-      if (error) throw new Error(`projects.list: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('projects.list', error));
 
       // Fetch task IDs per project
       const { data: tasks } = await supabase
@@ -466,7 +484,7 @@ export const api = {
         })
         .select('*, sprints!sprints_project_id_fkey(*)')
         .single();
-      if (error) throw new Error(`projects.create: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('projects.create', error));
       return rowToProject(data, []);
     },
 
@@ -477,7 +495,7 @@ export const api = {
         .eq('id', id)
         .select('*, sprints!sprints_project_id_fkey(*)')
         .single();
-      if (error) throw new Error(`projects.update: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('projects.update', error));
 
       const { data: tasks } = await supabase
         .from('tasks')
@@ -505,7 +523,7 @@ export const api = {
         })
         .select()
         .single();
-      if (error) throw new Error(`sprints.create: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('sprints.create', error));
 
       // Update project's current_sprint_id
       await supabase
@@ -532,7 +550,7 @@ export const api = {
         .eq('id', sprintId)
         .select()
         .single();
-      if (error) throw new Error(`sprints.update: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('sprints.update', error));
 
       // Update parent project's updated_at
       await supabase
@@ -565,7 +583,7 @@ export const api = {
         .from('sprints')
         .delete()
         .eq('id', sprintId);
-      if (error) throw new Error(`sprints.delete: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('sprints.delete', error));
 
       // Recalculate current_sprint_id for the parent project
       if (sprint) {
@@ -597,7 +615,7 @@ export const api = {
         .from('tasks')
         .select('*')
         .order('created_at', { ascending: false });
-      if (error) throw new Error(`tasks.list: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('tasks.list', error));
       return (data ?? []).map(rowToTask);
     },
 
@@ -632,7 +650,7 @@ export const api = {
         })
         .select()
         .single();
-      if (error) throw new Error(`tasks.create: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('tasks.create', error));
       return rowToTask(data);
     },
 
@@ -643,7 +661,7 @@ export const api = {
         .eq('id', id)
         .select()
         .single();
-      if (error) throw new Error(`tasks.update: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('tasks.update', error));
       return rowToTask(data);
     },
 
@@ -656,7 +674,7 @@ export const api = {
         .from('tasks')
         .delete()
         .eq('id', id);
-      if (error) throw new Error(`tasks.delete: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('tasks.delete', error));
       return true;
     },
   },
@@ -668,7 +686,7 @@ export const api = {
         .from('funnel_columns')
         .select('*')
         .order('position');
-      if (error) throw new Error(`funnelColumns.list: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('funnelColumns.list', error));
       return (data ?? []).map((row: any) => ({
         id: row.id,
         label: row.label,
@@ -698,7 +716,7 @@ export const api = {
         })
         .select()
         .single();
-      if (error) throw new Error(`funnelColumns.create: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('funnelColumns.create', error));
       return {
         id: data.id,
         label: data.label,
@@ -719,7 +737,7 @@ export const api = {
         .eq('id', id)
         .select()
         .single();
-      if (error) throw new Error(`funnelColumns.update: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('funnelColumns.update', error));
       return {
         id: data.id,
         label: data.label,
@@ -740,7 +758,7 @@ export const api = {
         .from('funnel_columns')
         .delete()
         .eq('id', id);
-      if (error) throw new Error(`funnelColumns.delete: ${error.message}`);
+      if (error) throw new Error(formatSupabaseError('funnelColumns.delete', error));
     },
 
     reorder: async (columns: { id: string; position: number }[]): Promise<void> => {

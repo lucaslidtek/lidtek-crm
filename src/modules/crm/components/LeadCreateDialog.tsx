@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/shared/components/ui/Dialog';
 import { Button } from '@/shared/components/ui/Button';
 import { Input, Textarea } from '@/shared/components/ui/Input';
@@ -29,6 +29,9 @@ export function LeadCreateDialog({ open, onOpenChange }: LeadCreateDialogProps) 
   const [billingCycle, setBillingCycle] = useState<BillingCycle | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Clear error when dialog opens
+  useEffect(() => { if (open) setError(null); }, [open]);
 
   // Resolve the effective owner: the selected value, or fall back to current user, or first user
   const effectiveOwnerId = ownerId || currentUser?.id || users[0]?.id || '';

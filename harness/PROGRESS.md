@@ -6,8 +6,8 @@
 
 ## Estado Atual do Projeto
 
-**Última atualização:** 2026-04-13 12:33 (BRT)
-**Sprint ativo:** S-SEC-01 (Segurança + Persistência)
+**Última atualização:** 2026-04-13 14:03 (BRT)
+**Sprint ativo:** S-PWA-01 (Progressive Web App)
 **Status geral:** ✅ Concluído
 
 ---
@@ -16,11 +16,14 @@
 
 O projeto é o Lidtek CRM — sistema de gestão de projetos e leads em React/Vite + Supabase.
 
-Na sessão de 2026-04-13, foram resolvidos dois problemas críticos:
+Na sessão de 2026-04-13 (tarde), o app foi configurado como PWA completo:
 
-1. **Bug de dados sumindo:** O frontend ficava vazio após inatividade porque o JWT expirava e o RLS retornava arrays vazios silenciosamente. Solução: validação ativa de token expirado, zombie-session guard no Store, e `visibilitychange` listener para re-validar sessão ao voltar à aba.
-
-2. **Vulnerabilidade de acesso aberto:** Qualquer pessoa com conta Google podia logar e virava admin automaticamente. Solução: whitelist por perfil no banco (RLS com `is_member()`), remoção do trigger de auto-criação de perfis, e tela de "Acesso Negado" no frontend.
+1. **PWA Setup:** Instalado `vite-plugin-pwa` com `registerType: 'autoUpdate'`, manifest completo (name: "CRM"), service worker com Workbox, runtime caching para Google Fonts.
+2. **Ícones PWA:** Gerados a partir da imagem fornecida em: 64x64, 192x192, 512x512, maskable 512x512, apple-touch-icon 180x180, favicons 16x16/32x32.
+3. **OG Image:** Gerada a partir do branding fornecido em 1200x630.
+4. **Meta tags PWA:** index.html atualizado com theme-color, apple-mobile-web-app-capable, apple-touch-icon, OG tags, twitter cards.
+5. **Install prompt:** Componente `PWAInstallPrompt` com hook `usePWAInstall` — captura `beforeinstallprompt`, exibe banner animado com botão de instalar.
+6. **Build validado:** manifest.webmanifest + sw.js + workbox gerados corretamente. 31 entries precached.
 
 **Para rodar:** `npm install && npm run dev`
 **Banco:** Supabase (hospedado). O script `supabase/whitelist_rls.sql` já foi executado.
@@ -28,6 +31,25 @@ Na sessão de 2026-04-13, foram resolvidos dois problemas críticos:
 ---
 
 ## Sprints
+
+### Sprint S-PWA-01: Progressive Web App — ✅ Concluído
+**Concluído em:** 2026-04-13
+**Tarefas:**
+
+- [x] T-01: Instalar vite-plugin-pwa
+- [x] T-02: Gerar ícones PWA em múltiplos tamanhos (64, 180, 192, 512, maskable)
+- [x] T-03: Configurar vite-plugin-pwa no vite.config.ts (manifest, workbox, autoUpdate)
+- [x] T-04: Atualizar index.html com meta tags PWA (theme-color, apple-touch-icon, OG)
+- [x] T-05: Registrar Service Worker (auto via plugin)
+- [x] T-06: Criar componente PWAInstallPrompt + hook usePWAInstall
+- [x] T-07: Sensor build — validar PWA (manifest + SW gerados)
+
+**Notas:**
+- Build completa com sucesso. Warnings de chunk size pré-existentes.
+- Erros de tsc pré-existentes (ColumnManagerDialog, Dashboard, MemberDetailDrawer) — nenhum novo.
+- OG image gerada em 1200x630 a partir do branding Lidtek.
+
+---
 
 ### Sprint S-SEC-01: Segurança + Persistência de Dados — ✅ Concluído
 **Concluído em:** 2026-04-13
@@ -71,7 +93,9 @@ Na sessão de 2026-04-13, foram resolvidos dois problemas críticos:
 
 - [ ] 2026-04-13 — `ColumnManagerDialog.tsx(177)`: propriedade `ringColor` inválida no CSS-in-JS
 - [ ] 2026-04-13 — `Dashboard.tsx(26)`: variável `greeting` declarada mas nunca usada
+- [ ] 2026-04-13 — `MemberDetailDrawer.tsx`: múltiplos erros de `cfg`/`roleConfig` possibly undefined
 - [ ] 2026-04-13 — `disable_rls.sql` existe no repositório — considerar mover para `.gitignore` ou renomear com prefixo `DANGER_`
+- [ ] 2026-04-13 — Bundle size: index.js > 500kB — considerar code splitting com dynamic imports
 
 ---
 
@@ -85,7 +109,8 @@ Na sessão de 2026-04-13, foram resolvidos dois problemas críticos:
 
 | Data | Agente | O que foi feito | Commit |
 |------|--------|-----------------|--------|
-| 2026-04-13 | Implementador | Persistência de dados (T-01 a T-07) + Segurança whitelist (T-08 a T-18) + Docs (T-19, T-20) | pendente |
+| 2026-04-13 (manhã) | Implementador | Persistência de dados (T-01 a T-07) + Segurança whitelist (T-08 a T-18) + Docs (T-19, T-20) | pendente |
+| 2026-04-13 (tarde) | Implementador | PWA completo: plugin, ícones, manifest, SW, install prompt (T-01 a T-07) | pendente |
 
 ---
 
@@ -114,3 +139,4 @@ npm run dev
 - `src/references/AUTH_RULES.md` — 7 regras de auth Supabase
 - `src/references/DATA_PERSISTENCE_GUIDE.md` — guia universal de persistência
 - `supabase/whitelist_rls.sql` — RLS com whitelist ativo
+- `vite.config.ts` — configuração PWA com vite-plugin-pwa

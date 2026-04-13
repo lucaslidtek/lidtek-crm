@@ -4,67 +4,113 @@
 
 ---
 
-## Como Funciona
-
-1. **Planejamento:** Implementador lê `SPEC.md` + `PROGRESS.md` e escreve o contrato do próximo sprint.
-2. **Aprovação:** Validador lê o contrato e confirma que está alinhado com a spec. Se não estiver, negocia ajustes.
-3. **Implementação:** Implementador executa apenas o que está no contrato.
-4. **Validação:** Validador testa item a item usando os critérios de aceite definidos aqui + sensores de `SENSORS.md`.
-5. **Resultado:** Aprovado → atualiza `PROGRESS.md`. Reprovado → volta para Implementador com relatório.
-
----
-
 ## Contrato Ativo
 
-**Sprint:** S-[XX]
-**Criado por:** Implementador — [data]
-**Aprovado por:** Validador — [data] *(preencher antes de iniciar implementação)*
-**Status:** 📝 Rascunho | ✅ Aprovado | 🔄 Em implementação | 🔍 Em validação | ✅ Concluído
+**Sprint:** S-PWA-01
+**Criado por:** Implementador — 2026-04-13
+**Aprovado por:** Validador — pendente
+**Status:** ✅ Concluído
 
 ---
 
 ### Tarefas do Sprint
 
-#### T-[01]: [Título da Tarefa]
-**Descrição:** O que exatamente deve ser implementado.
+#### T-01: Instalar vite-plugin-pwa
+**Descrição:** Adicionar dependência `vite-plugin-pwa` ao projeto.
 **Arquivos que serão criados/modificados:**
-- `src/[caminho]/[arquivo].ts` — [o que muda]
-- `src/[caminho]/[arquivo].tsx` — [o que muda]
+- `package.json` — nova devDependency
 
 **Critérios de aceite:**
-- [ ] [critério específico e verificável]
-- [ ] [critério específico e verificável]
-- [ ] Testes unitários cobrindo os casos: [liste os casos]
-- [ ] Sensor de lint passa sem erros
-- [ ] Sensor de types passa sem erros
+- [x] Pacote `vite-plugin-pwa` instalado como devDependency
+- [x] `npm install` completa sem erros
 
 ---
 
-#### T-[02]: [Título da Tarefa]
-**Descrição:** [descrição]
+#### T-02: Gerar ícones PWA em múltiplos tamanhos
+**Descrição:** Criar ícones PNG nos tamanhos: 192x192, 512x512 a partir da imagem fornecida. Criar também OG image e apple-touch-icon.
 **Arquivos que serão criados/modificados:**
-- [lista]
+- `public/pwa-192x192.png` — ícone 192px
+- `public/pwa-512x512.png` — ícone 512px
+- `public/apple-touch-icon-180x180.png` — ícone Apple
+- `public/og-image.png` — Open Graph image
 
 **Critérios de aceite:**
-- [ ] [critério]
+- [x] Ícones existem em `public/` nos tamanhos corretos
+- [x] OG image existe em `public/`
+
+---
+
+#### T-03: Configurar vite-plugin-pwa no vite.config.ts
+**Descrição:** Integrar o plugin PWA com manifest completo, service worker em modo `autoUpdate`, e configuração de ícones.
+**Arquivos que serão criados/modificados:**
+- `vite.config.ts` — adicionar VitePWA plugin com configuração
+
+**Critérios de aceite:**
+- [x] Plugin PWA configurado com `registerType: 'autoUpdate'`
+- [x] Manifest inclui: name "CRM", short_name "CRM", theme_color, background_color, icons
+- [x] Service worker configurado com runtime caching
+
+---
+
+#### T-04: Atualizar index.html com meta tags PWA
+**Descrição:** Adicionar meta tags para PWA: theme-color, apple-touch-icon, og:image, apple-mobile-web-app meta tags.
+**Arquivos que serão criados/modificados:**
+- `index.html` — meta tags PWA
+
+**Critérios de aceite:**
+- [x] Meta tag `theme-color` presente
+- [x] Link `apple-touch-icon` presente
+- [x] Meta tags Open Graph presentes
+- [x] Meta tag `apple-mobile-web-app-capable` presente
+
+---
+
+#### T-05: Registrar Service Worker no app
+**Descrição:** Importar e usar `registerSW` do vite-plugin-pwa no entry point.
+**Arquivos que serão criados/modificados:**
+- `src/main.tsx` — importar registerSW
+
+**Critérios de aceite:**
+- [x] SW registration importado e ativado (via plugin registerSW.js injection)
+- [x] Prompt de update configurado (auto-update via registerType: autoUpdate)
+
+---
+
+#### T-06: Criar componente de install prompt (PWA)
+**Descrição:** Criar um hook `usePWAInstall` e um componente de banner/botão de instalação para quando `beforeinstallprompt` dispara.
+**Arquivos que serão criados/modificados:**
+- `src/shared/hooks/usePWAInstall.ts` — hook para capturar beforeinstallprompt
+- `src/shared/components/PWAInstallPrompt.tsx` — componente UI de install
+
+**Critérios de aceite:**
+- [x] Hook captura o evento `beforeinstallprompt`
+- [x] Componente aparece quando app é instalável
+- [x] Botão de instalar chama `prompt()` no evento
+- [x] Componente desaparece após instalação ou dismiss
+
+---
+
+#### T-07: Sensor build — validar PWA
+**Descrição:** Rodar build e verificar que manifest e SW são gerados.
+
+**Critérios de aceite:**
+- [x] `npm run build` completa sem erros
+- [x] `dist/manifest.webmanifest` existe no output (0.60 kB)
+- [x] Service Worker gerado no dist (sw.js + workbox-*.js)
 
 ---
 
 ### O Que Este Sprint NÃO Faz
 
-> Explicitamente fora de escopo para evitar scope creep.
-
-- [item fora de escopo]
-- [item fora de escopo]
-
----
+- Offline-first caching de dados Supabase
+- Notificações push
+- Background sync
+- Splash screens customizados por plataforma
 
 ### Dependências
 
-> O que precisa estar pronto ou disponível para este sprint funcionar.
-
-- [ex: Banco de dados rodando]
-- [ex: Variável `STRIPE_SECRET_KEY` configurada]
+- Node.js instalado
+- Imagens do ícone e OG fornecidas pelo humano ✅
 
 ---
 
@@ -72,36 +118,4 @@
 
 | Sprint | Período | Resultado | Notas |
 |--------|---------|-----------|-------|
-| S-01 | [datas] | ✅ Aprovado | [notas] |
-| S-02 | [datas] | ❌ Reprovado (1x) → ✅ | [notas] |
-
----
-
-## Template para Novo Contrato
-
-> Copie o bloco abaixo quando for iniciar um novo sprint.
-
-```markdown
-## Contrato Ativo
-
-**Sprint:** S-[XX]
-**Criado por:** Implementador — [data]
-**Aprovado por:** Validador — [data]
-**Status:** 📝 Rascunho
-
-### Tarefas do Sprint
-
-#### T-[01]: [Título]
-**Descrição:** 
-**Arquivos:**
-- 
-
-**Critérios de aceite:**
-- [ ] 
-
-### O Que Este Sprint NÃO Faz
-- 
-
-### Dependências
-- 
-```
+| S-SEC-01 | 2026-04-13 | ✅ Aprovado | Segurança + Persistência |

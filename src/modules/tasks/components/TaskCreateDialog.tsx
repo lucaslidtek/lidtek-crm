@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/shared/components/ui/Dialog';
 import { Button } from '@/shared/components/ui/Button';
 import { Input, Textarea } from '@/shared/components/ui/Input';
@@ -27,6 +27,8 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Clear error when dialog opens
+  useEffect(() => { if (open) setError(null); }, [open]);
   // Effective owner: selected, or current user, or first user in list
   const effectiveOwnerId = ownerId || currentUser?.id || users[0]?.id || '';
   const isValid = title.trim();

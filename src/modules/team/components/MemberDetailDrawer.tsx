@@ -26,7 +26,7 @@ interface MemberDetailDrawerProps {
   onClose: () => void;
 }
 
-const ROLE_CONFIG: Record<UserRole, { label: string; icon: typeof Crown; color: string; bg: string }> = {
+const ROLE_CONFIG: Record<string, { label: string; icon: typeof Crown; color: string; bg: string }> = {
   admin: { label: 'Administrador', icon: Crown, color: 'text-primary', bg: 'bg-primary/15' },
   manager: { label: 'Gestor', icon: Shield, color: 'text-blue-light', bg: 'bg-blue-light/15' },
   gestor: { label: 'Gestor', icon: Shield, color: 'text-blue-light', bg: 'bg-blue-light/15' },
@@ -35,7 +35,7 @@ const ROLE_CONFIG: Record<UserRole, { label: string; icon: typeof Crown; color: 
   leitura: { label: 'Somente Leitura', icon: Eye, color: 'text-muted-foreground', bg: 'bg-muted/50' },
 };
 
-const ROLES: UserRole[] = ['admin', 'gestor', 'collaborator', 'readonly'];
+const ROLES: UserRole[] = ['admin', 'manager', 'collaborator', 'readonly'];
 
 function getAvatarGradient(initials: string): string {
   const gradients = [
@@ -143,7 +143,7 @@ function RoleSelector({ value, onSave }: { value: UserRole; onSave: (role: UserR
   return (
     <div className="grid grid-cols-2 gap-1.5">
       {ROLES.map((role) => {
-        const cfg = ROLE_CONFIG[role];
+        const cfg = ROLE_CONFIG[role] ?? ROLE_CONFIG.collaborator!;
         const RoleIcon = cfg.icon;
         const isActive = value === role;
         return (
@@ -201,7 +201,7 @@ export function MemberDetailDrawer({ member, onClose }: MemberDetailDrawerProps)
   }
 
   // Null-safe derived state
-  const roleConfig = member ? ROLE_CONFIG[member.role] : ROLE_CONFIG.collaborator;
+  const roleConfig = member ? (ROLE_CONFIG[member.role] ?? ROLE_CONFIG.collaborator!) : ROLE_CONFIG.collaborator!;
   const RoleIcon = roleConfig.icon;
   const gradient = member ? getAvatarGradient(member.initials) : 'from-zinc-400 to-zinc-600';
   const assignedProjects = member ? projects.filter((p) => p.ownerId === member.id).length : 0;

@@ -364,51 +364,91 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createLead = useCallback(async (data: Parameters<typeof api.leads.create>[0]) => {
-    const lead = await api.leads.create(data);
-    await refreshLeads();
-    return lead;
+    try {
+      const lead = await api.leads.create(data);
+      await refreshLeads();
+      return lead;
+    } catch (err) {
+      console.error('[Store] createLead failed:', err);
+      throw err;
+    }
   }, [refreshLeads]);
 
   const updateLead = useCallback(async (id: string, data: Partial<Lead>) => {
-    const lead = await api.leads.update(id, data);
-    // refreshLeads also re-enriches projects with lead data,
-    // so name/contact/phone changes propagate automatically.
-    await refreshLeads();
-    return lead;
+    try {
+      const lead = await api.leads.update(id, data);
+      // refreshLeads also re-enriches projects with lead data,
+      // so name/contact/phone changes propagate automatically.
+      await refreshLeads();
+      return lead;
+    } catch (err) {
+      console.error('[Store] updateLead failed:', err);
+      throw err;
+    }
   }, [refreshLeads]);
 
   const moveLeadStage = useCallback(async (id: string, stage: FunnelStage) => {
-    const lead = await api.leads.updateStage(id, stage);
-    await refreshLeads();
-    return lead;
+    try {
+      const lead = await api.leads.updateStage(id, stage);
+      await refreshLeads();
+      return lead;
+    } catch (err) {
+      console.error('[Store] moveLeadStage failed:', err);
+      throw err;
+    }
   }, [refreshLeads]);
 
   const deleteLead = useCallback(async (id: string) => {
-    await api.leads.delete(id);
-    await refreshLeads();
+    try {
+      await api.leads.delete(id);
+      await refreshLeads();
+    } catch (err) {
+      console.error('[Store] deleteLead failed:', err);
+      throw err;
+    }
   }, [refreshLeads]);
 
   const createTask = useCallback(async (data: Parameters<typeof api.tasks.create>[0]) => {
-    const task = await api.tasks.create(data);
-    await refreshTasks();
-    return task;
+    try {
+      const task = await api.tasks.create(data);
+      await refreshTasks();
+      return task;
+    } catch (err) {
+      console.error('[Store] createTask failed:', err);
+      throw err;
+    }
   }, [refreshTasks]);
 
   const updateTask = useCallback(async (id: string, data: Partial<Task>) => {
-    const task = await api.tasks.update(id, data);
-    await refreshTasks();
-    return task;
+    try {
+      const task = await api.tasks.update(id, data);
+      await refreshTasks();
+      return task;
+    } catch (err) {
+      console.error('[Store] updateTask failed:', err);
+      throw err;
+    }
   }, [refreshTasks]);
 
   const moveTaskStatus = useCallback(async (id: string, status: TaskStatus) => {
-    const task = await api.tasks.updateStatus(id, status);
-    await refreshTasks();
-    return task;
+    try {
+      const task = await api.tasks.updateStatus(id, status);
+      await refreshTasks();
+      return task;
+    } catch (err) {
+      console.error('[Store] moveTaskStatus failed:', err);
+      throw err;
+    }
   }, [refreshTasks]);
 
   const deleteTask = useCallback(async (id: string) => {
-    await api.tasks.delete(id);
-    await refreshTasks();
+    try {
+      await api.tasks.delete(id);
+      await refreshTasks();
+    } catch (err) {
+      console.error('[Store] deleteTask failed:', err);
+      throw err;
+    }
   }, [refreshTasks]);
 
   const createSprint = useCallback(async (projectId: string, data: Parameters<typeof api.sprints.create>[1]) => {
@@ -465,9 +505,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [users]);
 
   const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
-    const project = await api.projects.update(id, data);
-    await refreshProjects();
-    return project;
+    try {
+      const project = await api.projects.update(id, data);
+      await refreshProjects();
+      return project;
+    } catch (err) {
+      console.error('[Store] updateProject failed:', err);
+      throw err;
+    }
   }, [refreshProjects]);
 
   const refreshUsers = useCallback(async () => {
@@ -477,20 +522,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createUser = useCallback(async (data: Parameters<typeof api.users.create>[0]) => {
-    const user = await api.users.create(data);
-    await refreshUsers();
-    return user;
+    try {
+      const user = await api.users.create(data);
+      await refreshUsers();
+      return user;
+    } catch (err) {
+      console.error('[Store] createUser failed:', err);
+      throw err;
+    }
   }, [refreshUsers]);
 
   const updateUser = useCallback(async (id: string, data: Partial<User>) => {
-    const user = await api.users.update(id, data);
-    await refreshUsers();
-    return user;
+    try {
+      const user = await api.users.update(id, data);
+      await refreshUsers();
+      return user;
+    } catch (err) {
+      console.error('[Store] updateUser failed:', err);
+      throw err;
+    }
   }, [refreshUsers]);
 
   const deleteUser = useCallback(async (id: string) => {
-    await api.users.delete(id);
-    await refreshUsers();
+    try {
+      await api.users.delete(id);
+      await refreshUsers();
+    } catch (err) {
+      console.error('[Store] deleteUser failed:', err);
+      throw err;
+    }
   }, [refreshUsers]);
 
   const convertLeadToProject = useCallback(async (leadId: string, projectType: ProjectType) => {
