@@ -12,6 +12,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  accessDenied: boolean;
+  deniedEmail: string | null;
   login: () => void;
   loginWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
@@ -21,6 +23,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   isLoading: true,
+  accessDenied: false,
+  deniedEmail: null,
   login: () => {},
   loginWithPassword: async () => ({ error: null }),
   logout: async () => {},
@@ -79,6 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // This guarantees the Supabase auth token is in memory before the Store
   // fires any queries (prevents empty results from premature API calls).
   const [isLoading, setIsLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [deniedEmail, setDeniedEmail] = useState<string | null>(null);
   const loadingResolved = useRef(false);
 
   const resolveLoading = useCallback(() => {
@@ -89,12 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadProfile = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
-    // Set user immediately from JWT metadata (no network round-trip)
-    const fallback = authUserToProfile(authUser);
-    setUser(fallback);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
-
-    // Enrich from the profiles table — this resolves the real role and profile data
+    // Check if this user has a profile in the database (whitelist check)
     try {
       const { data: existing } = await supabase
         .from('profiles')
@@ -103,12 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (existing) {
-        // Profile exists — use the real data from the database
+        // Profile exists — user is authorized
         const profile: User = {
           id: existing.id,
           name: existing.name,
           email: existing.email,
-          // Use the real role from the database — overwrites the 'collaborator' fallback
           role: existing.role ?? 'collaborator',
           initials: existing.initials,
           avatarUrl: existing.avatar_url ?? undefined,
@@ -117,40 +117,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           status: existing.status ?? 'active',
         };
         setUser(profile);
+        setAccessDenied(false);
+        setDeniedEmail(null);
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
       } else {
-        // Profile missing (trigger didn't run) — create it now.
-        // Use 'admin' as the role for the first user to bootstrap the system.
-        const { data: created } = await supabase
-          .from('profiles')
-          .insert({
-            id: fallback.id,
-            name: fallback.name,
-            email: fallback.email,
-            role: 'admin', // Bootstrap: first user who can auth is admin
-            initials: fallback.initials,
-            avatar_url: fallback.avatarUrl ?? null,
-            status: 'active',
-          })
-          .select()
-          .single();
-
-        if (created) {
-          const profile: User = {
-            id: created.id,
-            name: created.name,
-            email: created.email,
-            role: created.role ?? 'admin',
-            initials: created.initials,
-            avatarUrl: created.avatar_url ?? undefined,
-            status: created.status ?? 'active',
-          };
-          setUser(profile);
-          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
-        }
+        // ── WHITELIST BLOCK ──
+        // User authenticated via Google/email but has NO profile in the database.
+        // This means they are NOT an authorized member. Block access.
+        console.warn(`[Auth] Access denied for ${authUser.email} — no profile in database.`);
+        setUser(null);
+        setAccessDenied(true);
+        setDeniedEmail(authUser.email ?? null);
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        // Sign out from Supabase so the token doesn't linger
+        await supabase.auth.signOut();
       }
     } catch {
-      // Ignore — fallback is already set
+      // Network error — use JWT metadata as temporary fallback
+      // (existing behavior for offline resilience)
+      const fallback = authUserToProfile(authUser);
+      setUser(fallback);
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
     }
   }, []);
 
@@ -341,7 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, loginWithPassword, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, accessDenied, deniedEmail, login, loginWithPassword, logout }}>
       {children}
     </AuthContext.Provider>
   );

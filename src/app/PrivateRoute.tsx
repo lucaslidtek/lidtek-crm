@@ -12,16 +12,25 @@ function isOAuthCallback(): boolean {
 }
 
 export function PrivateRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, accessDenied } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
+    // If user authenticated but isn't in the whitelist, redirect to access-denied
+    if (accessDenied) {
+      setLocation('/access-denied');
+      return;
+    }
     // NEVER redirect to /login while an OAuth callback is being processed —
     // the AuthProvider needs time to exchange the token / process the hash.
     if (!isLoading && !isAuthenticated && !isOAuthCallback()) {
       setLocation('/login');
     }
-  }, [isLoading, isAuthenticated, setLocation]);
+  }, [isLoading, isAuthenticated, accessDenied, setLocation]);
+
+  if (accessDenied) {
+    return null;
+  }
 
   if (isLoading || isOAuthCallback()) {
     return (
@@ -42,4 +51,3 @@ export function PrivateRoute({ children }: { children: ReactNode }) {
 
   return <>{children}</>;
 }
-

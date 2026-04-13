@@ -2,6 +2,7 @@ import { Route, Switch } from 'wouter';
 import { PageLayout } from '@/shared/components/layout/PageLayout';
 import { PrivateRoute } from './PrivateRoute';
 import { Login } from '@/modules/auth/pages/Login';
+import { AccessDenied } from '@/modules/auth/pages/AccessDenied';
 import { Dashboard } from '@/modules/dashboard/pages/Dashboard';
 import { CrmKanban } from '@/modules/crm/pages/CrmKanban';
 import { ProjectsPage } from '@/modules/projects/pages/ProjectsPage';
@@ -11,8 +12,9 @@ import { TeamPage } from '@/modules/team/pages/TeamPage';
 export function Router() {
   return (
     <Switch>
-      {/* Public route */}
+      {/* Public routes */}
       <Route path="/login" component={Login} />
+      <Route path="/access-denied" component={AccessDenied} />
 
       {/* Protected routes */}
       <Route>
@@ -45,4 +47,3 @@ export function Router() {
     </Switch>
   );
 }
-
