@@ -33,8 +33,11 @@ if (!globalThis.__supabaseClient) {
       autoRefreshToken: true,
       // Detect session from URL for OAuth callbacks
       detectSessionInUrl: true,
-      // Disable the lock that causes "Lock was not released within 5000ms"
-      lock: null as any,
+      // Bypass navigator.locks (causes "Lock was not released within 5000ms" on HMR).
+      // Instead of null, provide a real function that just runs fn() directly.
+      lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => {
+        return await fn();
+      },
     },
   });
 }

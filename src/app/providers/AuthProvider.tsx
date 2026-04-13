@@ -95,13 +95,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadProfile = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
+    // Build a fallback from JWT metadata — always available, no DB needed
+    const fallback = authUserToProfile(authUser);
+
     // Check if this user has a profile in the database (whitelist check)
     try {
-      const { data: existing } = await supabase
+      const { data: existing, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
         .maybeSingle();
+
+      if (error) {
+        // RLS or DB error — DON'T block access, use JWT fallback.
+        // This can happen if: is_member() function doesn't exist, policy
+        // conflict, network error, etc. Blocking here would lock everyone out.
+        console.error('[Auth] Profile query error (using fallback):', error.message);
+        setUser(fallback);
+        setAccessDenied(false);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
+        return;
+      }
 
       if (existing) {
         // Profile exists — user is authorized
@@ -121,21 +135,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDeniedEmail(null);
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
       } else {
+        // data is null AND no error → profile genuinely doesn't exist.
         // ── WHITELIST BLOCK ──
-        // User authenticated via Google/email but has NO profile in the database.
-        // This means they are NOT an authorized member. Block access.
         console.warn(`[Auth] Access denied for ${authUser.email} — no profile in database.`);
         setUser(null);
         setAccessDenied(true);
         setDeniedEmail(authUser.email ?? null);
         localStorage.removeItem(AUTH_STORAGE_KEY);
-        // Sign out from Supabase so the token doesn't linger
         await supabase.auth.signOut();
       }
-    } catch {
-      // Network error — use JWT metadata as temporary fallback
-      // (existing behavior for offline resilience)
-      const fallback = authUserToProfile(authUser);
+    } catch (err) {
+      // Network/unexpected error — use JWT metadata as temporary fallback
+      console.error('[Auth] Profile check failed (using fallback):', err);
       setUser(fallback);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
     }

@@ -46,7 +46,9 @@ if (!globalThis.__supabaseClient) {
       persistSession: true,                // Manter sessão entre reloads
       autoRefreshToken: true,              // Renovar JWT antes de expirar
       detectSessionInUrl: true,            // Processar OAuth callback
-      lock: null as any,                   // Desativar navigator.locks (causa timeout de 5s)
+      lock: async (_name: string, _timeout: number, fn: () => Promise<any>) => {
+        return await fn();   // No-op lock — bypassa navigator.locks sem travar
+      },
     },
   });
 }
@@ -61,7 +63,7 @@ export const supabase = globalThis.__supabaseClient;
 | `globalThis` singleton | HMR cria múltiplos clients → lock de IndexedDB trava |
 | `flowType: 'implicit'` | PKCE usa navigator.locks que travam em abas inativas |
 | `storage: localStorage` | Evita ambiguidade entre localStorage e IndexedDB |
-| `lock: null` | "Lock was not released within 5000ms" em hot-reload |
+| `lock: no-op fn` | `lock: null` faz `getSession()` travar → queries penduram indefinidamente |
 | `autoRefreshToken: true` | Token expira sem re-auth se desativado |
 
 ---
@@ -241,7 +243,7 @@ Antes de considerar auth + data persistence "pronto", verificar:
 | 1 | `persistSession: true` (explícito no createClient) | ☐ |
 | 2 | `autoRefreshToken: true` (explícito) | ☐ |
 | 3 | HMR singleton (`globalThis.__supabaseClient`) | ☐ |
-| 4 | `lock: null` (sem IndexedDB lock) | ☐ |
+| 4 | `lock: no-op function` (NÃO usar `null`!) | ☐ |
 | 5 | `TOKEN_REFRESHED` tratado no `onAuthStateChange` | ☐ |
 | 6 | Phantom `SIGNED_OUT` guard (delay 300ms + `getUser()`) | ☐ |
 | 7 | Token expirado → `getUser()` fallback (checar `expires_at`) | ☐ |
@@ -257,7 +259,7 @@ Antes de considerar auth + data persistence "pronto", verificar:
 
 ```
 1. SUPABASE CLIENT
-   → Singleton (globalThis) + lock: null + configs explícitas
+   → Singleton (globalThis) + lock: no-op fn + configs explícitas
 
 2. AUTH PROVIDER
    → getSession() no init + checar expires_at
@@ -289,3 +291,4 @@ Antes de considerar auth + data persistence "pronto", verificar:
 | Limpar dados do Store quando fetch retorna `[]` | RLS retorna vazio silenciosamente com token morto |
 | Auto-criar perfil para qualquer autenticado | Qualquer pessoa com Google entra no sistema |
 | Usar `flowType: 'pkce'` em SPA sem backend | Navigator.locks travam em abas inativas |
+| `lock: null` no createClient | `null` não é uma função — `getSession()` trava e queries penduram para sempre. Usar no-op function |

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { Lead, Project, Task, User, Sprint, FunnelStage, FunnelColumn, TaskStatus, ProjectType } from '@/shared/types/models';
 import { api } from '@/shared/lib/supabaseApi';
+import { supabase } from '@/shared/lib/supabase';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { DEFAULT_FUNNEL_COLUMNS } from '@/shared/lib/constants';
 
@@ -173,12 +174,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const [u, l, p, t, fc] = await Promise.all([
-        api.users.list(),
-        api.leads.list(),
-        api.projects.list(),
-        api.tasks.list(),
-        api.funnelColumns.list(),
+        api.users.list().catch(e => { console.error('[Store] users.list failed:', e.message); return [] as User[]; }),
+        api.leads.list().catch(e => { console.error('[Store] leads.list failed:', e.message); return [] as Lead[]; }),
+        api.projects.list().catch(e => { console.error('[Store] projects.list failed:', e.message); return [] as Project[]; }),
+        api.tasks.list().catch(e => { console.error('[Store] tasks.list failed:', e.message); return [] as Task[]; }),
+        api.funnelColumns.list().catch(e => { console.error('[Store] funnelColumns.list failed:', e.message); return [] as FunnelColumn[]; }),
       ]);
+
 
       // ── Zombie-session guard ──
       // If ALL collections came back empty but we already had data in cache,
@@ -192,17 +194,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // Force a session revalidation — if the token truly expired, AuthProvider
         // will catch it and redirect to login. If the token is fine (e.g. user
         // really has no data), the next refreshAll will succeed normally.
-        import('@/shared/lib/supabase').then(({ supabase }) => {
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (!user) {
-              // Session is truly dead — the AuthProvider listener will handle logout
-              supabase.auth.signOut();
-            } else {
-              // Session is valid — user genuinely has empty data, allow it
-              _cache = null; // Clear stale cache so next refresh accepts empty
-              fetchedRef.current = false; // Allow re-fetch on next cycle
-            }
-          });
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (!user) {
+            supabase.auth.signOut();
+          } else {
+            _cache = null;
+            fetchedRef.current = false;
+          }
         });
         setLoading(false);
         return;
