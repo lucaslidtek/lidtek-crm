@@ -272,6 +272,13 @@
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
 }
 
+/* Bottom Navigation — explicit safe area handling for iOS */
+@utility bottom-nav-safe {
+  padding-top: 0.625rem; /* 10px */
+  padding-bottom: 0.75rem; /* 12px base */
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
 /* Drag handle indicator inside bottom sheets */
 @utility drag-handle {
   width: 36px;

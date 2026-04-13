@@ -303,26 +303,27 @@ export const api = {
   // --- Leads ---
   leads: {
     list: async (): Promise<Lead[]> => {
-      const { data: leads, error } = await supabase
-        .from('leads')
-        .select('*, interactions(*)')
-        .order('created_at', { ascending: false });
-      if (error) throw new Error(formatSupabaseError('leads.list', error));
-
-      // Fetch task IDs per lead
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select('id, lead_id')
-        .not('lead_id', 'is', null);
+      // Parallel fetch: leads + task IDs at the same time (eliminates waterfall)
+      const [leadsResult, tasksResult] = await Promise.all([
+        supabase
+          .from('leads')
+          .select('*, interactions(*)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('tasks')
+          .select('id, lead_id')
+          .not('lead_id', 'is', null),
+      ]);
+      if (leadsResult.error) throw new Error(formatSupabaseError('leads.list', leadsResult.error));
 
       const tasksByLead = new Map<string, string[]>();
-      for (const t of tasks ?? []) {
+      for (const t of tasksResult.data ?? []) {
         const arr = tasksByLead.get(t.lead_id) ?? [];
         arr.push(t.id);
         tasksByLead.set(t.lead_id, arr);
       }
 
-      return (leads ?? []).map((row) => rowToLead(row, tasksByLead.get(row.id) ?? []));
+      return (leadsResult.data ?? []).map((row) => rowToLead(row, tasksByLead.get(row.id) ?? []));
     },
 
     getById: async (id: string): Promise<Lead | undefined> => {
@@ -409,21 +410,22 @@ export const api = {
   // --- Projects ---
   projects: {
     list: async (): Promise<Project[]> => {
-      const { data: projects, error } = await supabase
-        .from('projects')
-        .select('*, sprints!sprints_project_id_fkey(*)')
-        .order('created_at', { ascending: false });
-      if (error) throw new Error(formatSupabaseError('projects.list', error));
-
-      // Fetch task IDs per project
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select('id, project_id, sprint_id')
-        .not('project_id', 'is', null);
+      // Parallel fetch: projects + task IDs at the same time (eliminates waterfall)
+      const [projectsResult, tasksResult] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('*, sprints!sprints_project_id_fkey(*)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('tasks')
+          .select('id, project_id, sprint_id')
+          .not('project_id', 'is', null),
+      ]);
+      if (projectsResult.error) throw new Error(formatSupabaseError('projects.list', projectsResult.error));
 
       const tasksByProject = new Map<string, string[]>();
       const tasksBySprint = new Map<string, string[]>();
-      for (const t of tasks ?? []) {
+      for (const t of tasksResult.data ?? []) {
         // Per project
         const projArr = tasksByProject.get(t.project_id) ?? [];
         projArr.push(t.id);
@@ -436,7 +438,7 @@ export const api = {
         }
       }
 
-      return (projects ?? []).map((row) => {
+      return (projectsResult.data ?? []).map((row) => {
         const project = rowToProject(row, tasksByProject.get(row.id) ?? []);
         // Populate sprint taskIds
         project.sprints = project.sprints.map(s => ({

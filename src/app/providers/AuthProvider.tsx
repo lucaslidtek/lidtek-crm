@@ -4,6 +4,7 @@ import { supabase } from '@/shared/lib/supabase';
 
 // ============================================
 // AUTH — Supabase Google OAuth (PKCE-safe)
+// Turbo: Cache-first instant loading
 // ============================================
 
 const AUTH_STORAGE_KEY = 'lidtek-crm-auth';
@@ -69,8 +70,6 @@ if (!localStorage.getItem(AUTH_MIGRATION_KEY)) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize user from localStorage for instant HMR UX — no flash-to-login.
-  // BUT isLoading ALWAYS starts true: the Store must wait for getSession()
-  // to complete before querying, so the Supabase JWT is in memory and ready.
   const [user, setUser] = useState<User | null>(() => {
     try {
       const cached = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -79,13 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
   });
-  // Always true on mount — resolved only after getSession() finishes.
-  // This guarantees the Supabase auth token is in memory before the Store
-  // fires any queries (prevents empty results from premature API calls).
-  const [isLoading, setIsLoading] = useState(true);
+
+  // ── TURBO: Cache-first loading ──
+  // If we have a cached user, resolve loading IMMEDIATELY so the app renders
+  // with cached data. Session validation happens in background (non-blocking).
+  // Only start with isLoading=true if there's NO cached user (cold start / first login).
+  const hasCachedUser = (() => {
+    try { return !!localStorage.getItem(AUTH_STORAGE_KEY); } catch { return false; }
+  })();
+
+  const [isLoading, setIsLoading] = useState(!hasCachedUser);
   const [accessDenied, setAccessDenied] = useState(false);
   const [deniedEmail, setDeniedEmail] = useState<string | null>(null);
-  const loadingResolved = useRef(false);
+  const loadingResolved = useRef(!hasCachedUser ? false : true);
 
   const resolveLoading = useCallback(() => {
     if (!loadingResolved.current) {
@@ -176,56 +181,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Safety net: if nothing resolves in 5s, force loading=false
+    // Safety net: if nothing resolves in 2s (was 5s), force loading=false
     const safetyTimeout = setTimeout(() => {
       if (mounted) resolveLoading();
-    }, 5000);
+    }, 2000);
 
-    // ── HMR fast-path ──
-    // On hot-reload, the component remounts with isLoading=true but the
-    // localStorage cache still has a valid user. We set the user immediately
-    // so the UI doesn't flash to the login screen, BUT we still call
-    // getSession() and only resolve isLoading AFTER it completes. This
-    // ensures the Supabase JWT is in memory before the Store fires queries.
+    // ── TURBO: Cached user fast-path ──
+    // If we have a cached user, isLoading is already false (resolved in useState).
+    // We still validate the session in background but the UI renders immediately.
     const cachedUser = localStorage.getItem(AUTH_STORAGE_KEY);
     if (cachedUser) {
-      // User is cached — set for UI, but DON'T resolveLoading() yet.
-      // The Store checks isLoading and won't fire queries until it's false.
-
-      // Call getSession() to ensure the JWT is loaded into the Supabase client
+      // Background validation — non-blocking, UI already rendered
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!mounted) return;
-        // Check if the token is already expired
         const isExpired = session?.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
 
         if (session?.user && !isExpired) {
+          // Silent profile refresh in background
           loadProfile(session.user as Parameters<typeof loadProfile>[0]);
         } else if (session?.user && isExpired) {
-          // Token is expired. getSession returns it while refreshing in the background.
-          // Wait for a real network check to confirm if the refresh succeeded or not.
+          // Token expired — try to refresh
           supabase.auth.getUser().then(({ data: { user } }) => {
             if (!mounted) return;
             if (user) {
               loadProfile(user as Parameters<typeof loadProfile>[0]);
             } else {
+              // Session truly dead — clear and redirect
               setUser(null);
               localStorage.removeItem(AUTH_STORAGE_KEY);
+              resolveLoading(); // Force loading state for redirect
             }
-            resolveLoading();
           });
-          return; // resolveLoading will be called by getUser
+          return;
         } else {
-          // Session expired — clear cache and force re-login
+          // No session — clear cache, force re-login
           setUser(null);
           localStorage.removeItem(AUTH_STORAGE_KEY);
         }
-        // NOW resolve loading — JWT is ready (or user is cleared)
         resolveLoading();
       }).catch(() => {
         if (mounted) resolveLoading();
       });
 
-      // Still subscribe for future auth changes (logout, token refresh)
+      // Subscribe for future auth changes (logout, token refresh)
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         async (event, session) => {
           if (!mounted) return;

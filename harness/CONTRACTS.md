@@ -6,7 +6,7 @@
 
 ## Contrato Ativo
 
-**Sprint:** S-PWA-01
+**Sprint:** S-PERF-01
 **Criado por:** Implementador — 2026-04-13
 **Aprovado por:** Validador — pendente
 **Status:** ✅ Concluído
@@ -15,102 +15,91 @@
 
 ### Tarefas do Sprint
 
-#### T-01: Instalar vite-plugin-pwa
-**Descrição:** Adicionar dependência `vite-plugin-pwa` ao projeto.
+#### T-01: Splash Screen inline no index.html
+**Descrição:** Adicionar um splash screen CSS-only dentro do `<div id="root">` que aparece instantaneamente antes do JS carregar. React o substitui automaticamente ao montar.
 **Arquivos que serão criados/modificados:**
-- `package.json` — nova devDependency
+- `index.html` — splash screen inline com CSS
 
 **Critérios de aceite:**
-- [x] Pacote `vite-plugin-pwa` instalado como devDependency
-- [x] `npm install` completa sem erros
+- [x] Splash screen visível imediatamente ao abrir o app (antes do JS)
+- [x] React substitui automaticamente ao montar
+- [x] Usa o theme-color do PWA (#0a0a0f) como background
+- [x] Spinner e texto "CRM" visíveis durante loading
 
 ---
 
-#### T-02: Gerar ícones PWA em múltiplos tamanhos
-**Descrição:** Criar ícones PNG nos tamanhos: 192x192, 512x512 a partir da imagem fornecida. Criar também OG image e apple-touch-icon.
+#### T-02: Auth Fast-Path (Cache-First)
+**Descrição:** Se tem user cached em localStorage, resolver isLoading IMEDIATAMENTE e validar sessão em background. Reduzir safety timeout de 5s → 2s.
 **Arquivos que serão criados/modificados:**
-- `public/pwa-192x192.png` — ícone 192px
-- `public/pwa-512x512.png` — ícone 512px
-- `public/apple-touch-icon-180x180.png` — ícone Apple
-- `public/og-image.png` — Open Graph image
+- `src/app/providers/AuthProvider.tsx` — cache-first auth
 
 **Critérios de aceite:**
-- [x] Ícones existem em `public/` nos tamanhos corretos
-- [x] OG image existe em `public/`
+- [x] Se há cache, `resolveLoading()` é chamado imediatamente (sem esperar getSession)
+- [x] Validação de sessão acontece em background (non-blocking)
+- [x] Safety timeout reduzido de 5s para 2s
+- [x] Se sessão expira em background, redirecionar para login
+- [x] Nenhuma regressão — auth continua funcionando para login, logout, HMR
 
 ---
 
-#### T-03: Configurar vite-plugin-pwa no vite.config.ts
-**Descrição:** Integrar o plugin PWA com manifest completo, service worker em modo `autoUpdate`, e configuração de ícones.
+#### T-03: Lazy Loading de Rotas
+**Descrição:** Converter rotas protegidas para `React.lazy()` + `Suspense`. Dashboard carrega eager (rota padrão), demais são lazy.
 **Arquivos que serão criados/modificados:**
-- `vite.config.ts` — adicionar VitePWA plugin com configuração
+- `src/app/Router.tsx` — lazy imports + Suspense
 
 **Critérios de aceite:**
-- [x] Plugin PWA configurado com `registerType: 'autoUpdate'`
-- [x] Manifest inclui: name "CRM", short_name "CRM", theme_color, background_color, icons
-- [x] Service worker configurado com runtime caching
+- [x] Dashboard importado estaticamente (rota padrão)
+- [x] CrmKanban, ProjectsPage, TasksKanban, TeamPage carregam via `React.lazy()`
+- [x] Suspense fallback mostra spinner consistente
+- [x] Navegação entre rotas funciona sem erros
 
 ---
 
-#### T-04: Atualizar index.html com meta tags PWA
-**Descrição:** Adicionar meta tags para PWA: theme-color, apple-touch-icon, og:image, apple-mobile-web-app meta tags.
+#### T-04: Store Cache Persistence (localStorage)
+**Descrição:** Persistir o `_cache` do StoreProvider em localStorage. Hidratar estado com dados cached no cold start. Mostrar dados cached IMEDIATAMENTE enquanto refreshAll roda em background sem loading spinner.
 **Arquivos que serão criados/modificados:**
-- `index.html` — meta tags PWA
+- `src/shared/lib/store.tsx` — localStorage persistence + instant hydration
 
 **Critérios de aceite:**
-- [x] Meta tag `theme-color` presente
-- [x] Link `apple-touch-icon` presente
-- [x] Meta tags Open Graph presentes
-- [x] Meta tag `apple-mobile-web-app-capable` presente
+- [x] Dados persistidos em localStorage ao atualizar
+- [x] useState hidratado com localStorage no cold start
+- [x] `loading` começa como `false` se tiver cache
+- [x] refreshAll roda em background sem mostrar loading spinner
+- [x] Cache invalidado ao fazer logout
 
 ---
 
-#### T-05: Registrar Service Worker no app
-**Descrição:** Importar e usar `registerSW` do vite-plugin-pwa no entry point.
+#### T-05: API Waterfall Consolidation
+**Descrição:** Consolidar queries sequenciais em `leads.list()` e `projects.list()` usando `Promise.all()` para executar em paralelo.
 **Arquivos que serão criados/modificados:**
-- `src/main.tsx` — importar registerSW
+- `src/shared/lib/supabaseApi.ts` — parallelizar queries internas
 
 **Critérios de aceite:**
-- [x] SW registration importado e ativado (via plugin registerSW.js injection)
-- [x] Prompt de update configurado (auto-update via registerType: autoUpdate)
+- [x] `leads.list()` executa as 2 queries (leads + task IDs) em paralelo
+- [x] `projects.list()` executa as 2 queries (projects + task IDs) em paralelo
+- [x] Nenhuma regressão — dados retornam corretamente
 
 ---
 
-#### T-06: Criar componente de install prompt (PWA)
-**Descrição:** Criar um hook `usePWAInstall` e um componente de banner/botão de instalação para quando `beforeinstallprompt` dispara.
-**Arquivos que serão criados/modificados:**
-- `src/shared/hooks/usePWAInstall.ts` — hook para capturar beforeinstallprompt
-- `src/shared/components/PWAInstallPrompt.tsx` — componente UI de install
+#### T-06: Sensor build — validar otimizações
+**Descrição:** Rodar build e verificar que tudo compila corretamente com as otimizações.
 
 **Critérios de aceite:**
-- [x] Hook captura o evento `beforeinstallprompt`
-- [x] Componente aparece quando app é instalável
-- [x] Botão de instalar chama `prompt()` no evento
-- [x] Componente desaparece após instalação ou dismiss
-
----
-
-#### T-07: Sensor build — validar PWA
-**Descrição:** Rodar build e verificar que manifest e SW são gerados.
-
-**Critérios de aceite:**
-- [x] `npm run build` completa sem erros
-- [x] `dist/manifest.webmanifest` existe no output (0.60 kB)
-- [x] Service Worker gerado no dist (sw.js + workbox-*.js)
+- [x] `npm run build` completa sem erros novos
+- [x] Lazy-loaded chunks são gerados separadamente no dist
 
 ---
 
 ### O Que Este Sprint NÃO Faz
 
 - Offline-first caching de dados Supabase
-- Notificações push
-- Background sync
-- Splash screens customizados por plataforma
+- Service worker para dados da API
+- SSR ou pre-rendering
+- Otimização de queries no lado do Supabase (functions/views)
 
 ### Dependências
 
-- Node.js instalado
-- Imagens do ícone e OG fornecidas pelo humano ✅
+- Nenhuma nova dependência necessária
 
 ---
 
@@ -119,3 +108,4 @@
 | Sprint | Período | Resultado | Notas |
 |--------|---------|-----------|-------|
 | S-SEC-01 | 2026-04-13 | ✅ Aprovado | Segurança + Persistência |
+| S-PWA-01 | 2026-04-13 | ✅ Aprovado | PWA completo |

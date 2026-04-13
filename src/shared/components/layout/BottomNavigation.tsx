@@ -39,9 +39,12 @@ export function BottomNavigation() {
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50',
         'glass flex items-center justify-around',
-        'pt-2.5 pb-[max(calc(env(safe-area-inset-bottom)+0.75rem),0.75rem)]',
         'border-t border-border-subtle md:hidden'
       )}
+      style={{
+        paddingTop: '0.625rem',
+        paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))',
+      }}
     >
       {visibleItems.map((item) => {
         const isActive =

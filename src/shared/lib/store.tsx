@@ -66,6 +66,41 @@ interface StoreActions {
 type StoreContextType = StoreState & StoreActions;
 
 // ────────────────────────────────────────────
+// MODULE-LEVEL HMR CACHE + LOCALSTORAGE PERSISTENCE
+// TURBO: Persisted to localStorage so cold starts hydrate instantly.
+// ────────────────────────────────────────────
+const STORE_CACHE_KEY = 'lidtek-crm-store-cache';
+
+type CacheShape = {
+  leads: Lead[];
+  projects: Project[];
+  tasks: Task[];
+  users: User[];
+  funnelColumns: FunnelColumn[];
+};
+
+function loadPersistedCache(): CacheShape | null {
+  try {
+    const raw = localStorage.getItem(STORE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.leads) && Array.isArray(parsed.projects)) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function persistCache(cache: CacheShape) {
+  try {
+    localStorage.setItem(STORE_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // localStorage full or unavailable
+  }
+}
+
 // MODULE-LEVEL HMR CACHE
 // Vite HMR remounts React components but does NOT re-execute modules that
 // weren’t edited. This cache lives at module scope — it survives StoreProvider
@@ -78,7 +113,7 @@ let _cache: {
   tasks: Task[];
   users: User[];
   funnelColumns: FunnelColumn[];
-} | null = null;
+} | null = loadPersistedCache();
 
 const StoreContext = createContext<StoreContextType | null>(null);
 
@@ -127,7 +162,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Re-enrich projects with updated lead data
       setProjects(current => enrichProjectsWithLeads(current, fresh));
       // Update cache
-      if (_cache) _cache.leads = fresh;
+      if (_cache) {
+        _cache.leads = fresh;
+        persistCache(_cache);
+      }
     } catch (err) {
       console.warn('[Store] refreshLeads failed - preserving existing state:', err);
     }
@@ -141,7 +179,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const enriched = enrichProjectsWithLeads(fresh, currentLeads);
       setProjects(enriched);
       // Update cache
-      if (_cache) _cache.projects = enriched;
+      if (_cache) {
+        _cache.projects = enriched;
+        persistCache(_cache);
+      }
     } catch (err) {
       console.warn('[Store] refreshProjects failed — preserving existing state:', err);
     }
@@ -152,7 +193,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const fresh = await api.tasks.list();
       setTasks(fresh);
       // Update cache
-      if (_cache) _cache.tasks = fresh;
+      if (_cache) {
+        _cache.tasks = fresh;
+        persistCache(_cache);
+      }
     } catch (err) {
       console.warn('[Store] refreshTasks failed — preserving existing state:', err);
     }
@@ -164,7 +208,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const resolved = cols.length > 0 ? cols : DEFAULT_FUNNEL_COLUMNS;
       setFunnelColumns(resolved);
       // Update cache
-      if (_cache) _cache.funnelColumns = resolved;
+      if (_cache) {
+        _cache.funnelColumns = resolved;
+        persistCache(_cache);
+      }
     } catch (err) {
       console.warn('[Store] refreshFunnelColumns failed:', err);
     }
@@ -258,8 +305,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProjects(enrichedProjects);
       setTasks(finalTasks);
       setFunnelColumns(resolvedColumns);
-      // Populate module-level cache so HMR remounts restore data instantly
+      // Populate module-level cache + persist to localStorage
       _cache = { leads: l, projects: enrichedProjects, tasks: finalTasks, users: resolvedUsers, funnelColumns: resolvedColumns };
+      persistCache(_cache);
     } catch (err) {
       // DON'T wipe state on error — preserve whatever is in state already.
       // The user sees stale data rather than an empty screen.
@@ -280,12 +328,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (isAuthenticated) {
       if (!fetchedRef.current) {
         fetchedRef.current = true;
-        refreshAll();
+        // TURBO: If we have cache, run refreshAll WITHOUT showing loading spinner.
+        // The UI already has data from cache, so the refresh is silent.
+        if (_cache) {
+          // Silent refresh — don't flash loading
+          refreshAll().then(() => setLoading(false));
+        } else {
+          refreshAll();
+        }
       }
     } else {
-      // Logged out — clear everything including cache
+      // Logged out — clear everything including cache + persisted store
       fetchedRef.current = false;
       _cache = null;
+      try { localStorage.removeItem(STORE_CACHE_KEY); } catch { /* noop */ }
       setLeads([]);
       setProjects([]);
       setTasks([]);
@@ -328,6 +384,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setTasks(t);
         setFunnelColumns(resolvedColumns);
         _cache = { leads: l, projects: enrichedProjects, tasks: t, users: u, funnelColumns: resolvedColumns };
+        persistCache(_cache);
       }).catch(err => {
         console.warn('[Store] Visibility refresh failed — preserving existing state:', err);
       });
