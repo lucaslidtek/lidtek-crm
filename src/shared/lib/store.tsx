@@ -554,28 +554,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshTasks, refreshProjects]);
 
   const moveTaskStatus = useCallback(async (id: string, status: TaskStatus) => {
+    // 1. Optimistic update
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+
     try {
+      // 2. Perform backend update for task
       const task = await api.tasks.updateStatus(id, status);
-      // Bidirectional sync: if task is linked to a sprint, sync sprint status
+      
+      // 3. Bidirectional sync: if task is linked to a sprint, sync sprint status
       const linkedTask = tasks.find(t => t.id === id);
       if (linkedTask?.sprintId) {
-        const sprintStatusMap: Record<TaskStatus, string> = {
-          'todo': 'active',
-          'in_progress': 'active',
-          'done': 'completed',
-          'blocked': 'active',
-        };
-        const newSprintStatus = sprintStatusMap[status];
-        if (newSprintStatus === 'completed') {
-          await api.sprints.complete(linkedTask.sprintId);
-        } else {
-          await api.sprints.update(linkedTask.sprintId, { status: newSprintStatus as any });
+        try {
+          const sprintStatusMap: Record<TaskStatus, string> = {
+            'todo': 'active',
+            'in_progress': 'active',
+            'done': 'completed',
+            'blocked': 'active',
+          };
+          const newSprintStatus = sprintStatusMap[status];
+          if (newSprintStatus === 'completed') {
+            await api.sprints.complete(linkedTask.sprintId);
+          } else {
+            await api.sprints.update(linkedTask.sprintId, { status: newSprintStatus as any });
+          }
+        } catch (e) {
+          console.warn('[Store] Bidirectional sync Task->Sprint failed:', e);
         }
       }
+      
+      // 4. Refresh actual state
       await Promise.all([refreshTasks(), refreshProjects()]);
       return task;
     } catch (err) {
       console.error('[Store] moveTaskStatus failed:', err);
+      // Revert optimistic update on failure
+      await refreshTasks();
       throw err;
     }
   }, [refreshTasks, refreshProjects, tasks]);
