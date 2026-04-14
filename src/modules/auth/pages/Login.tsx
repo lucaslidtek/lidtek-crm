@@ -77,36 +77,40 @@ export function Login() {
         RIGHT COLUMN (AUTH) - Full width on Mobile, 45% on Desktop
         =========================================================
       */}
-      <div className="w-full lg:w-[45%] flex items-center justify-center relative p-6 sm:p-12 bg-background z-20">
+      <div className="w-full lg:w-[45%] flex items-center justify-center relative p-6 sm:p-12 z-20">
         
-        {/* Mobile Background Context (Hidden on Desktop) */}
-        <div className="absolute inset-0 block lg:hidden">
-          <img src={selectedImage} className="w-full h-full object-cover opacity-30 dark:opacity-10 mix-blend-luminosity" />
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-2xl" />
+        {/* Mobile Background — Full bleed image like the desktop hero */}
+        <div className="absolute inset-0 block lg:hidden bg-zinc-950 overflow-hidden">
+          <img src={selectedImage} className="w-full h-full object-cover opacity-70 mix-blend-luminosity scale-105" />
+          {/* Brand color tint — same recipe as desktop */}
+          <div className="absolute inset-0 bg-primary/25 mix-blend-overlay" />
+          <div className="absolute inset-0 bg-primary/10 mix-blend-color" />
+          {/* Vignette for card readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/70" />
         </div>
-
-        {/* Subtle decorative glow for mobile */}
-        <div className="absolute -top-[200px] -right-[150px] w-[500px] h-[500px] rounded-full bg-primary/10 blur-[100px] pointer-events-none lg:hidden" />
 
         <motion.div
           className={cn(
             "w-full max-w-[380px] text-center relative z-10",
-            // Mobile: Glass card style // Desktop: No borders, pure background
-            "p-8 sm:p-10 rounded-2xl glass lg:bg-transparent lg:border-transparent lg:shadow-none lg:p-0"
+            // Mobile: Dark frosted glass over the hero image
+            "p-8 sm:p-10 rounded-2xl",
+            "bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/30",
+            // Desktop: Clean transparent panel (inherits bg-background from parent)
+            "lg:bg-background lg:backdrop-blur-none lg:border-transparent lg:shadow-none lg:rounded-none lg:p-0"
           )}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          {/* Logo Context (Only visible on mobile/tablet since Desktop has it in the Hero) */}
+          {/* Logo — inverted white on mobile, normal on desktop */}
           <div className="flex justify-center mb-6 lg:mb-8 lg:hidden">
-            <img src="/branding/icon.svg" alt="Lidtek" className="w-14 h-14" />
+            <img src="/branding/icon.svg" alt="Lidtek" className="w-14 h-14 filter brightness-0 invert" />
           </div>
 
-          <h1 className="font-[family-name:var(--font-display)] text-[1.65rem] font-bold tracking-tight text-foreground mb-1.5">
+          <h1 className="font-[family-name:var(--font-display)] text-[1.65rem] font-bold tracking-tight text-white lg:text-foreground mb-1.5">
             Lidtek CRM
           </h1>
-          <p className="text-foreground-muted text-sm mb-8 lg:mb-10">
+          <p className="text-white/60 lg:text-foreground-muted text-sm mb-8 lg:mb-10">
             Acesse seu espaço de trabalho
           </p>
 
@@ -138,7 +142,7 @@ export function Login() {
             )}
           </button>
 
-          <p className="text-foreground-muted/40 text-[10px] mt-8 lg:mt-12 uppercase tracking-widest font-semibold">
+          <p className="text-white/30 lg:text-foreground-muted/40 text-[10px] mt-8 lg:mt-12 uppercase tracking-widest font-semibold">
             Acesso Restrito
           </p>
         </motion.div>
