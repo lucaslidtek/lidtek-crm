@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/utils/cn';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
+import { DatePicker } from '@/shared/components/ui/DatePicker';
 import { MobileDrawerWrapper } from '@/shared/components/layout/MobileDrawerWrapper';
 import { useStore } from '@/shared/lib/store';
 import { LEAD_ORIGINS, BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageColor } from '@/shared/lib/constants';
@@ -139,7 +140,7 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
       type: 'sales',
       status: 'todo',
       priority: 'medium',
-      ownerId: lead.ownerId || users[0]?.id || '',
+      ownerIds: lead.ownerId ? [lead.ownerId] : users[0]?.id ? [users[0].id] : [],
       tags: [],
       leadId: lead.id,
     });
@@ -308,10 +309,11 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
                     />
                   </DetailRow>
                   <DetailRow label="Próx. contato">
-                    <DateInput
+                    <DatePicker
                       value={lead.nextContactDate || ''}
-                      onSave={(v) => handleFieldSave('nextContactDate', v)}
-                      alert={!!isOverdue}
+                      onChange={(v) => handleFieldSave('nextContactDate', v ?? '')}
+                      variant="compact"
+                      placeholder="Definir"
                     />
                   </DetailRow>
                   <DetailRow label="Cobrança">
@@ -993,28 +995,7 @@ function OwnerSelector({ ownerId, users, getUserById, onSave }: {
   );
 }
 
-/* ─── Date Input ─── */
-function DateInput({ value, onSave, alert }: { value: string; onSave: (v: string) => void; alert?: boolean }) {
-  const [editing, setEditing] = useState(false);
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
-
-  if (!editing) {
-    return (
-      <button onClick={() => setEditing(true)} className={cn('text-xs cursor-pointer hover:text-primary transition-colors', alert ? 'text-red-500 font-medium' : 'text-zinc-700 dark:text-zinc-300')}>
-        {value ? new Date(value).toLocaleDateString('pt-BR') : <span className="text-zinc-400 italic">Definir</span>}
-      </button>
-    );
-  }
-  return (
-    <input
-      ref={ref} type="date" defaultValue={value}
-      onBlur={(e) => { onSave(e.target.value); setEditing(false); }}
-      onKeyDown={(e) => { if (e.key === 'Enter') { onSave((e.target as HTMLInputElement).value); setEditing(false); } }}
-      className="text-xs bg-transparent outline-none border-b border-primary/30 text-zinc-700 dark:text-zinc-300"
-    />
-  );
-}
+/* DateInput removed — replaced by shared DatePicker component */
 
 /* ─── Billing Selector ─── */
 function BillingSelector({ billingType, billingCycle, onSaveType, onSaveCycle }: {

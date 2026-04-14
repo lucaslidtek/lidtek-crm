@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/shared/components/ui/Dialog';
 import { Button } from '@/shared/components/ui/Button';
 import { Input, Textarea } from '@/shared/components/ui/Input';
+import { DatePicker } from '@/shared/components/ui/DatePicker';
 import { Select, SelectItem } from '@/shared/components/ui/Select';
+import { MultiUserSelect } from '@/shared/components/ui/MultiUserSelect';
 import { useStore } from '@/shared/lib/store';
 import { useAuth } from '@/app/providers/AuthProvider';
 import type { TaskType, TaskPriority, TaskStatus } from '@/shared/types/models';
@@ -19,7 +21,7 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
   const [title, setTitle] = useState('');
   const [type, setType] = useState<TaskType>('standalone');
   const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [ownerId, setOwnerId] = useState('');
+  const [ownerIds, setOwnerIds] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState('');
   const [description, setDescription] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -29,12 +31,16 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
 
   // Clear error when dialog opens
   useEffect(() => { if (open) setError(null); }, [open]);
-  // Effective owner: selected, or current user, or first user in list
-  const effectiveOwnerId = ownerId || currentUser?.id || users[0]?.id || '';
+
+  // Effective owners: selected, or current user
+  const effectiveOwnerIds = ownerIds.length > 0
+    ? ownerIds
+    : currentUser?.id ? [currentUser.id] : users[0]?.id ? [users[0].id] : [];
+
   const isValid = title.trim();
 
   const handleSubmit = async () => {
-    if (!isValid || !effectiveOwnerId) return;
+    if (!isValid || effectiveOwnerIds.length === 0) return;
     setLoading(true);
     setError(null);
     try {
@@ -44,7 +50,7 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
         type,
         status: 'todo' as TaskStatus,
         priority,
-        ownerId: effectiveOwnerId,
+        ownerIds: effectiveOwnerIds,
         dueDate: dueDate || undefined,
         tags: [],
         projectId: type === 'project' && projectId ? projectId : undefined,
@@ -53,7 +59,7 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
       // Reset on success
       setTitle('');
       setDescription('');
-      setOwnerId('');
+      setOwnerIds([]);
       setDueDate('');
       setProjectId('');
       setLeadId('');
@@ -83,7 +89,7 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
             onChange={(e) => setTitle(e.target.value)}
           />
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <Select label="Tipo" value={type} onValueChange={(v) => setType(v as TaskType)} placeholder="Tipo">
               <SelectItem value="project">Projeto</SelectItem>
               <SelectItem value="sales">Vendas</SelectItem>
@@ -94,12 +100,15 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
               <SelectItem value="medium">Média</SelectItem>
               <SelectItem value="low">Baixa</SelectItem>
             </Select>
-            <Select label="Responsável" value={effectiveOwnerId} onValueChange={setOwnerId} placeholder="Responsável">
-              {users.map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.name.split(' ')[0]}</SelectItem>
-              ))}
-            </Select>
           </div>
+
+          <MultiUserSelect
+            label="Responsáveis"
+            users={users}
+            selectedIds={effectiveOwnerIds}
+            onChange={setOwnerIds}
+            placeholder="Selecione os responsáveis..."
+          />
 
           {/* Conditional: project or lead select */}
           {type === 'project' && (
@@ -117,11 +126,12 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
             </Select>
           )}
 
-          <Input
+          <DatePicker
             label="Prazo"
-            type="date"
+            variant="field"
             value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
+            onChange={(v) => setDueDate(v ?? '')}
+            placeholder="Selecionar data"
           />
 
           <Textarea
@@ -140,7 +150,7 @@ export function TaskCreateDialog({ open, onOpenChange }: TaskCreateDialogProps) 
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={!isValid || loading || !effectiveOwnerId}>
+          <Button onClick={handleSubmit} disabled={!isValid || loading || effectiveOwnerIds.length === 0}>
             {loading ? 'Criando...' : 'Criar Tarefa'}
           </Button>
         </DialogFooter>

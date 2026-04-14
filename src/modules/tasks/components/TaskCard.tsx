@@ -12,7 +12,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
   const { getUserById, leads, projects } = useStore();
-  const owner = getUserById(task.ownerId);
+  const owners = (task.ownerIds ?? []).map(id => getUserById(id)).filter(Boolean);
 
   // Overdue logic
   const now = Date.now();
@@ -94,14 +94,37 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
         {isDueSoon && !isOverdue && <Badge variant="medium">Em 48h</Badge>}
       </div>
 
-      {/* Footer — owner + date */}
+      {/* Footer — owners (stacked avatars) + date */}
       <div className="flex items-center justify-between pt-1.5 border-t border-border-subtle/50">
-        {owner ? (
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center flex-shrink-0">
-              <span className="text-[8px] font-bold text-primary">{owner.initials}</span>
+        {owners.length > 0 ? (
+          <div className="flex items-center">
+            {/* Stacked avatar chips */}
+            <div className="flex items-center -space-x-1.5">
+              {owners.slice(0, 3).map((owner) => (
+                <div
+                  key={owner!.id}
+                  className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center border border-white dark:border-zinc-900 flex-shrink-0"
+                  title={owner!.name}
+                >
+                  <span className="text-[7px] font-bold text-primary">{owner!.initials}</span>
+                </div>
+              ))}
+              {owners.length > 3 && (
+                <div className="w-5 h-5 rounded-md bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-white dark:border-zinc-900 flex-shrink-0">
+                  <span className="text-[7px] font-bold text-foreground-muted">+{owners.length - 3}</span>
+                </div>
+              )}
             </div>
-            <span className="text-[11px] text-foreground-muted truncate">{owner.name.split(' ')[0]}</span>
+            {owners.length === 1 && (
+              <span className="text-[11px] text-foreground-muted truncate ml-1.5">
+                {owners[0]!.name.split(' ')[0]}
+              </span>
+            )}
+            {owners.length > 1 && (
+              <span className="text-[10px] text-foreground-muted ml-1.5">
+                {owners.length} pessoas
+              </span>
+            )}
           </div>
         ) : (
           <div />
@@ -119,4 +142,3 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
     </div>
   );
 }
-

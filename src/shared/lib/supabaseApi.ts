@@ -122,6 +122,10 @@ function rowToProject(row: any, taskIds: string[] = []): Project {
 }
 
 function rowToTask(row: any): Task {
+  // Support both owner_ids (array) and legacy owner_id (single)
+  const ownerIds: string[] = row.owner_ids && row.owner_ids.length > 0
+    ? row.owner_ids
+    : row.owner_id ? [row.owner_id] : [];
   return {
     id: row.id,
     title: row.title,
@@ -129,7 +133,7 @@ function rowToTask(row: any): Task {
     type: row.type,
     status: row.status,
     priority: row.priority,
-    ownerId: row.owner_id,
+    ownerIds,
     dueDate: row.due_date ?? undefined,
     tags: row.tags ?? [],
     projectId: row.project_id ?? undefined,
@@ -198,7 +202,10 @@ function buildTaskUpdate(updates: Partial<Task>): Record<string, any> {
   if (updates.type !== undefined) payload.type = updates.type;
   if (updates.status !== undefined) payload.status = updates.status;
   if (updates.priority !== undefined) payload.priority = updates.priority;
-  if (updates.ownerId !== undefined) payload.owner_id = updates.ownerId;
+  if (updates.ownerIds !== undefined) {
+    payload.owner_ids = updates.ownerIds;
+    payload.owner_id = updates.ownerIds[0] ?? null;
+  }
   if (updates.dueDate !== undefined) payload.due_date = updates.dueDate;
   if (updates.tags !== undefined) payload.tags = updates.tags;
   if (updates.projectId !== undefined) payload.project_id = updates.projectId;
@@ -689,7 +696,8 @@ export const api = {
           type: input.type,
           status: input.status,
           priority: input.priority,
-          owner_id: input.ownerId,
+          owner_ids: input.ownerIds,
+          owner_id: input.ownerIds[0] ?? null,
           due_date: input.dueDate,
           tags: input.tags ?? [],
           project_id: input.projectId,

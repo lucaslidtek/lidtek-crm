@@ -130,7 +130,7 @@ export interface Task {
   type: TaskType;
   status: TaskStatus;
   priority: TaskPriority;
-  ownerId: string;
+  ownerIds: string[];
   dueDate?: string;
   tags: string[];
   projectId?: string;

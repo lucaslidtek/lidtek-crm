@@ -17,7 +17,7 @@ export const mockProjects: Project[] = [
     clientContact: 'gerencia@supcentral.com.br',
     type: 'recurring',
     status: 'active',
-    ownerId: 'user-3',
+    ownerIds: ['user-3'],
     currentSprintId: 'spr-1b',
     sprints: [
       sprint({ id: 'spr-1a', projectId: 'proj-1', name: 'Onboarding — Setup inicial', stage: 'onboarding', priority: 'medium', startDate: daysAgo(60), endDate: daysAgo(50), status: 'completed' }),
@@ -35,7 +35,7 @@ export const mockProjects: Project[] = [
     clientContact: 'dr.silva@silvaprado.adv.br',
     type: 'recurring',
     status: 'active',
-    ownerId: 'user-3',
+    ownerIds: ['user-3'],
     currentSprintId: 'spr-2c',
     sprints: [
       sprint({ id: 'spr-2a', projectId: 'proj-2', name: 'Onboarding — Migração de dados', stage: 'onboarding', priority: 'medium', startDate: daysAgo(45), endDate: daysAgo(38), status: 'completed' }),
@@ -54,7 +54,7 @@ export const mockProjects: Project[] = [
     clientContact: 'admin@bemestar.med.br',
     type: 'recurring',
     status: 'active',
-    ownerId: 'user-4',
+    ownerIds: ['user-4'],
     currentSprintId: 'spr-3b',
     sprints: [
       sprint({ id: 'spr-3a', projectId: 'proj-3', name: 'Levantamento e Arquitetura', stage: 'architecture', priority: 'medium', startDate: daysAgo(30), endDate: daysAgo(20), status: 'completed' }),
@@ -72,7 +72,7 @@ export const mockProjects: Project[] = [
     clientContact: 'compras@distnorte.com.br',
     type: 'recurring',
     status: 'paused',
-    ownerId: 'user-3',
+    ownerIds: ['user-3'],
     currentSprintId: 'spr-4a',
     sprints: [
       sprint({ id: 'spr-4a', projectId: 'proj-4', name: 'Desenvolvimento — Sprint 2', stage: 'development', priority: 'medium', startDate: daysAgo(15), status: 'active' }),
@@ -90,7 +90,7 @@ export const mockProjects: Project[] = [
     clientContact: 'contato@raizesdobem.org.br',
     type: 'oneshot',
     status: 'active',
-    ownerId: 'user-4',
+    ownerIds: ['user-4'],
     currentSprintId: 'spr-5b',
     sprints: [
       sprint({ id: 'spr-5a', projectId: 'proj-5', name: 'Kickoff — Definição de escopo', stage: 'onboarding', priority: 'medium', startDate: daysAgo(20), endDate: daysAgo(15), status: 'completed' }),
@@ -108,7 +108,7 @@ export const mockProjects: Project[] = [
     clientContact: 'reservas@vistamar.com.br',
     type: 'oneshot',
     status: 'active',
-    ownerId: 'user-3',
+    ownerIds: ['user-3'],
     currentSprintId: 'spr-6b',
     sprints: [
       sprint({ id: 'spr-6a', projectId: 'proj-6', name: 'Arquitetura — Definição técnica', stage: 'architecture', priority: 'medium', startDate: daysAgo(18), endDate: daysAgo(12), status: 'completed' }),
@@ -126,7 +126,7 @@ export const mockProjects: Project[] = [
     clientContact: 'direcao@futurobrilhante.edu.br',
     type: 'oneshot',
     status: 'active',
-    ownerId: 'user-4',
+    ownerIds: ['user-4'],
     currentSprintId: 'spr-7a',
     sprints: [
       sprint({ id: 'spr-7a', projectId: 'proj-7', name: 'Deploy — Publicação em produção', stage: 'deploy', priority: 'high', startDate: daysAgo(3), status: 'active', taskIds: ['task-p8'] }),
@@ -143,7 +143,7 @@ export const mockProjects: Project[] = [
     clientContact: 'contato@cervejariahop.com.br',
     type: 'oneshot',
     status: 'completed',
-    ownerId: 'user-3',
+    ownerIds: ['user-3'],
     sprints: [
       sprint({ id: 'spr-8a', projectId: 'proj-8', name: 'Projeto completo', stage: 'deploy', priority: 'medium', startDate: daysAgo(90), endDate: daysAgo(20), status: 'completed' }),
     ],

@@ -3,7 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { Button } from '@/shared/components/ui/Button';
 import { Input, Textarea } from '@/shared/components/ui/Input';
+import { DatePicker } from '@/shared/components/ui/DatePicker';
 import { Select, SelectItem } from '@/shared/components/ui/Select';
+import { MultiUserSelect } from '@/shared/components/ui/MultiUserSelect';
 import { useStore } from '@/shared/lib/store';
 import type { Task, TaskType, TaskPriority } from '@/shared/types/models';
 import { Trash2 } from 'lucide-react';
@@ -20,7 +22,7 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
   const [title, setTitle] = useState('');
   const [type, setType] = useState<TaskType>('standalone');
   const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [ownerId, setOwnerId] = useState('');
+  const [ownerIds, setOwnerIds] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState('');
   const [description, setDescription] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -36,7 +38,7 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
       setTitle(task.title);
       setType(task.type);
       setPriority(task.priority);
-      setOwnerId(task.ownerId);
+      setOwnerIds(task.ownerIds ?? []);
       setDueDate(task.dueDate ? task.dueDate.split('T')[0] ?? '' : '');
       setDescription(task.description ?? '');
       setProjectId(task.projectId ?? '');
@@ -58,7 +60,7 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
         description: description.trim() || undefined,
         type,
         priority,
-        ownerId,
+        ownerIds,
         dueDate: dueDate || undefined,
         projectId: type === 'project' && projectId ? projectId : undefined,
         leadId: type === 'sales' && leadId ? leadId : undefined,
@@ -108,7 +110,7 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
               onChange={(e) => setTitle(e.target.value)}
             />
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <Select label="Tipo" value={type} onValueChange={(v) => setType(v as TaskType)} placeholder="Tipo">
                 <SelectItem value="project">Projeto</SelectItem>
                 <SelectItem value="sales">Vendas</SelectItem>
@@ -119,12 +121,15 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
                 <SelectItem value="medium">Média</SelectItem>
                 <SelectItem value="low">Baixa</SelectItem>
               </Select>
-              <Select label="Responsável" value={ownerId} onValueChange={setOwnerId} placeholder="Responsável">
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.name.split(' ')[0]}</SelectItem>
-                ))}
-              </Select>
             </div>
+
+            <MultiUserSelect
+              label="Responsáveis"
+              users={users}
+              selectedIds={ownerIds}
+              onChange={setOwnerIds}
+              placeholder="Selecione os responsáveis..."
+            />
 
             {type === 'project' && (
               <Select label="Projeto" value={projectId} onValueChange={setProjectId} placeholder="Selecione o projeto...">
@@ -141,11 +146,12 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
               </Select>
             )}
 
-            <Input
+            <DatePicker
               label="Prazo"
-              type="date"
+              variant="field"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(v) => setDueDate(v ?? '')}
+              placeholder="Selecionar data"
             />
 
             <Textarea

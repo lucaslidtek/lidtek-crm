@@ -8,7 +8,8 @@ interface DatePickerProps {
   onChange: (date: string | undefined) => void;
   placeholder?: string;
   disabled?: boolean;
-  variant?: 'default' | 'compact' | 'badge-overdue' | 'badge-upcoming';
+  variant?: 'default' | 'compact' | 'badge-overdue' | 'badge-upcoming' | 'field';
+  label?: string;
   className?: string;
 }
 
@@ -32,6 +33,7 @@ export function DatePicker({
   placeholder = '+ Prazo',
   disabled = false,
   variant = 'default',
+  label,
   className,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
@@ -139,7 +141,9 @@ export function DatePicker({
 
   // Format display
   const displayText = parsedDate
-    ? parsedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    ? variant === 'field'
+      ? parsedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : parsedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
     : placeholder;
 
   // Variant styles for trigger
@@ -148,11 +152,17 @@ export function DatePicker({
     'flex items-center gap-1.5 cursor-pointer transition-all rounded-md text-[10px] font-medium group/date relative',
     variant === 'compact' && 'px-2 py-1',
     variant === 'default' && 'px-2.5 py-1 text-xs border',
+    variant === 'field' && [
+      'w-full px-4 py-2.5 rounded-lg text-sm text-left',
+      'bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700',
+      'focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40',
+      !parsedDate && 'text-foreground-muted/50',
+    ],
     (variant === 'badge-overdue' || (variant === 'default' && isOverdue && parsedDate)) &&
       'text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 px-2 py-1',
     (variant === 'badge-upcoming' || (variant === 'default' && parsedDate && !isOverdue)) &&
       'text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 px-2 py-1',
-    !parsedDate && variant !== 'compact' &&
+    !parsedDate && variant !== 'compact' && variant !== 'field' &&
       'border border-dashed border-zinc-300 dark:border-zinc-600 text-foreground-muted/60 hover:text-foreground-muted hover:border-primary/40 hover:bg-primary/5',
     !parsedDate && variant === 'compact' &&
       'text-foreground-muted/50 hover:text-foreground-muted border border-dashed border-zinc-300 dark:border-zinc-600 hover:border-primary/40 hover:bg-primary/5',
@@ -162,6 +172,9 @@ export function DatePicker({
 
   return (
     <>
+      {label && (
+        <label className="label-style text-foreground-muted block mb-1.5">{label}</label>
+      )}
       <button
         ref={triggerRef}
         type="button"
@@ -169,7 +182,7 @@ export function DatePicker({
         className={triggerStyles}
         title={parsedDate ? `Prazo: ${parsedDate.toLocaleDateString('pt-BR')}` : 'Definir prazo'}
       >
-        <CalendarDays className="w-3 h-3 flex-shrink-0" />
+        <CalendarDays className={cn('flex-shrink-0', variant === 'field' ? 'w-4 h-4 text-foreground-muted' : 'w-3 h-3')} />
         <span>{displayText}</span>
       </button>
 

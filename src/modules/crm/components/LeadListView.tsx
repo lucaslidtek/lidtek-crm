@@ -1,20 +1,105 @@
+import { useState, useMemo } from 'react';
 import { useStore } from '@/shared/lib/store';
 import type { Lead } from '@/shared/types/models';
 import { Badge } from '@/shared/components/ui/Badge';
 import { BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageColor } from '@/shared/lib/constants';
-import { Calendar, Building2, Phone, Repeat, Zap } from 'lucide-react';
+import { Calendar, Building2, Phone, Repeat, Zap, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
+
+type SortKey = 'name' | 'contact' | 'stage' | 'estimatedValue' | 'billingType' | 'nextContactDate' | 'owner';
+type SortDir = 'asc' | 'desc';
 
 interface LeadListViewProps {
   leads: Lead[];
   onLeadClick: (lead: Lead) => void;
 }
 
+const COLUMNS: { key: SortKey; label: string }[] = [
+  { key: 'name', label: 'Empresa / Lead' },
+  { key: 'contact', label: 'Contato' },
+  { key: 'stage', label: 'Estágio' },
+  { key: 'estimatedValue', label: 'Valor Estimado' },
+  { key: 'billingType', label: 'Cobrança' },
+  { key: 'nextContactDate', label: 'Próximo Contato' },
+  { key: 'owner', label: 'Responsável' },
+];
+
 export function LeadListView({ leads, onLeadClick }: LeadListViewProps) {
   const { getUserById, funnelColumns } = useStore();
 
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortedLeads = useMemo(() => {
+    if (!sortKey) return leads;
+
+    return [...leads].sort((a, b) => {
+      let aVal: string | number | null = null;
+      let bVal: string | number | null = null;
+
+      switch (sortKey) {
+        case 'name':
+          aVal = a.name?.toLowerCase() ?? '';
+          bVal = b.name?.toLowerCase() ?? '';
+          break;
+        case 'contact':
+          aVal = a.contact?.toLowerCase() ?? '';
+          bVal = b.contact?.toLowerCase() ?? '';
+          break;
+        case 'stage':
+          aVal = getStageLabel(funnelColumns, a.stage)?.toLowerCase() ?? '';
+          bVal = getStageLabel(funnelColumns, b.stage)?.toLowerCase() ?? '';
+          break;
+        case 'estimatedValue':
+          aVal = a.estimatedValue ?? -Infinity;
+          bVal = b.estimatedValue ?? -Infinity;
+          break;
+        case 'billingType':
+          aVal = a.billingType ?? '';
+          bVal = b.billingType ?? '';
+          break;
+        case 'nextContactDate':
+          aVal = a.nextContactDate ? new Date(a.nextContactDate).getTime() : -Infinity;
+          bVal = b.nextContactDate ? new Date(b.nextContactDate).getTime() : -Infinity;
+          break;
+        case 'owner': {
+          const ownerA = getUserById(a.ownerId);
+          const ownerB = getUserById(b.ownerId);
+          aVal = ownerA?.name?.toLowerCase() ?? '';
+          bVal = ownerB?.name?.toLowerCase() ?? '';
+          break;
+        }
+      }
+
+      if (aVal === bVal) return 0;
+      if (aVal === '' || aVal === -Infinity) return 1;
+      if (bVal === '' || bVal === -Infinity) return -1;
+
+      const cmp = aVal < bVal ? -1 : 1;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [leads, sortKey, sortDir, funnelColumns, getUserById]);
+
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
+
+  const SortIcon = ({ colKey }: { colKey: SortKey }) => {
+    if (sortKey !== colKey) {
+      return <ArrowUpDown className="w-3 h-3 opacity-0 group-hover/th:opacity-50 transition-opacity" />;
+    }
+    return sortDir === 'asc'
+      ? <ArrowUp className="w-3 h-3 text-primary" />
+      : <ArrowDown className="w-3 h-3 text-primary" />;
+  };
 
   return (
     <div className="glass rounded-xl overflow-hidden animate-fade-in">
@@ -22,17 +107,25 @@ export function LeadListView({ leads, onLeadClick }: LeadListViewProps) {
         <table className="w-full text-left text-sm whitespace-nowrap">
           <thead>
             <tr className="border-b border-border-subtle bg-black/5 dark:bg-white/5 uppercase tracking-wider text-[10px] font-semibold text-foreground-muted">
-              <th className="px-6 py-4">Empresa / Lead</th>
-              <th className="px-6 py-4">Contato</th>
-              <th className="px-6 py-4">Estágio</th>
-              <th className="px-6 py-4">Valor Estimado</th>
-              <th className="px-6 py-4">Cobrança</th>
-              <th className="px-6 py-4">Próximo Contato</th>
-              <th className="px-6 py-4">Responsável</th>
+              {COLUMNS.map((col) => (
+                <th
+                  key={col.key}
+                  onClick={() => handleSort(col.key)}
+                  className={cn(
+                    'px-6 py-4 cursor-pointer select-none group/th transition-colors hover:text-foreground',
+                    sortKey === col.key && 'text-primary',
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    {col.label}
+                    <SortIcon colKey={col.key} />
+                  </div>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border-subtle">
-            {leads.map((lead) => {
+            {sortedLeads.map((lead) => {
               const owner = getUserById(lead.ownerId);
               const stageColor = getStageColor(funnelColumns, lead.stage);
               const stageLabel = getStageLabel(funnelColumns, lead.stage);

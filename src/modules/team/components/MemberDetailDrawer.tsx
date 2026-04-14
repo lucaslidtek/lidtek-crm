@@ -204,8 +204,8 @@ export function MemberDetailDrawer({ member, onClose }: MemberDetailDrawerProps)
   const roleConfig = member ? (ROLE_CONFIG[member.role] ?? ROLE_CONFIG.collaborator!) : ROLE_CONFIG.collaborator!;
   const RoleIcon = roleConfig.icon;
   const gradient = member ? getAvatarGradient(member.initials) : 'from-zinc-400 to-zinc-600';
-  const assignedProjects = member ? projects.filter((p) => p.ownerId === member.id).length : 0;
-  const assignedTasks = member ? tasks.filter((t) => t.ownerId === member.id).length : 0;
+  const assignedProjects = member ? projects.filter((p) => p.ownerIds.includes(member.id)).length : 0;
+  const assignedTasks = member ? tasks.filter((t) => t.ownerIds.includes(member.id)).length : 0;
 
   async function handleFieldSave(field: keyof User, value: string) {
     if (!member) return;

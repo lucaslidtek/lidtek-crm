@@ -54,7 +54,7 @@ export function Dashboard() {
   // ─── Minhas tarefas ───
   const myPendingTasks = useMemo(() =>
     tasks
-      .filter(t => t.ownerId === user?.id && t.status !== 'done')
+      .filter(t => user?.id && t.ownerIds.includes(user.id) && t.status !== 'done')
       .sort((a, b) => {
         // Overdue first, then by due date
         const aOver = a.dueDate && new Date(a.dueDate) < now ? -1 : 0;

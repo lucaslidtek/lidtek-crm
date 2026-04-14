@@ -219,10 +219,12 @@ export function CrmKanban() {
               onDeleteColumn={canEditAll ? handleDeleteColumn : undefined}
             />
           ) : (
-            <LeadListView
-              leads={filteredLeads}
-              onLeadClick={(lead) => setSelectedLeadId(lead.id)}
-            />
+            <div className="h-full overflow-y-auto">
+              <LeadListView
+                leads={filteredLeads}
+                onLeadClick={(lead) => setSelectedLeadId(lead.id)}
+              />
+            </div>
           )}
         </div>
 

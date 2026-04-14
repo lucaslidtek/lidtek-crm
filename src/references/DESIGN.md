@@ -507,4 +507,42 @@ Elementos que usam safe-area: `BottomNavigation` (`.bottom-nav-padding`), `Mobil
 12. **Touch targets ≥ 44px** — botões e áreas clicáveis no mobile
 13. **Sem container visual no mobile** — cards full-bleed, limpo
 14. **Entidades vinculadas sempre visíveis** — chip colorido com ícone, não texto muted
+15. **Nunca usar `<input type="date">` diretamente** — sempre usar `<DatePicker>` compartilhado
+
+### 12.1 DatePicker — Componente Compartilhado
+
+**Arquivo:** `src/shared/components/ui/DatePicker.tsx`
+
+Calendário custom com portal (`createPortal`) que escapa qualquer stacking context. Usa grid de dias com navegação mês a mês, botões "Limpar" e "Hoje".
+
+**Variantes:**
+
+| Variante | Uso | Visual |
+|---|---|---|
+| `default` | Sprints, campos inline | Badge com cor (overdue=red, upcoming=amber) |
+| `compact` | Dentro de drawers/detail rows | Texto pequeno, sem borda |
+| `field` | Formulários (dialogs de criar/editar) | Full-width, estilo de Input com label |
+| `badge-overdue` | Forçar estilo vermelho | Badge vermelho |
+| `badge-upcoming` | Forçar estilo âmbar | Badge âmbar |
+
+**Uso:**
+
+```tsx
+// Em formulários (TaskCreateDialog, TaskEditDialog)
+<DatePicker label="Prazo" variant="field" value={date} onChange={setDate} />
+
+// Em drawers inline (LeadDetailDrawer)
+<DatePicker variant="compact" value={date} onChange={(v) => save(v ?? '')} />
+
+// Em sprints (ProjectListView)
+<DatePicker value={sprint.dueDate} onChange={handleDate} />
+```
+
+**Props:**
+- `value?: string` — ISO date `YYYY-MM-DD`
+- `onChange: (date: string | undefined) => void` — `undefined` quando limpa
+- `label?: string` — Label acima (apenas `field`)
+- `variant` — Estilo visual
+- `placeholder?: string` — Default: `"+ Prazo"`
+- `disabled?: boolean`
 
