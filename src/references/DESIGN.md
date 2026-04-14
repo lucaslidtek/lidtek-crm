@@ -446,19 +446,46 @@ O item de projeto tem **dois layouts distintos**:
 <meta name="viewport" content="..., viewport-fit=cover">
 ```
 
+**⚠️ Regra crítica para `env(safe-area-inset-*)`:**
+
+| Método | Funciona no iOS? | Usar? |
+|---|---|---|
+| Tailwind `pb-[calc(env(…))]` | ❌ Pode ser stripped | **Não** |
+| Tailwind `@utility` | ❌ Compilado, env() removido | **Não** |
+| Inline style `paddingBottom: calc(…+env(…))` | ❌ Inconsistente | **Não** |
+| **CSS class com `@supports`** | ✅ Progressive enhancement | **Sim** |
+
 ```css
-/* globals.css */
-.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+/* globals.css — Abordagem correta */
+.bottom-nav-padding {
+  padding-top: 0.625rem;
+  padding-bottom: 0.75rem; /* fallback seguro */
+}
+
+/* iOS 11.0-11.1 */
+@supports (padding-bottom: constant(safe-area-inset-bottom)) {
+  .bottom-nav-padding {
+    padding-bottom: calc(0.75rem + constant(safe-area-inset-bottom));
+  }
+}
+
+/* iOS 11.2+ e todos os browsers modernos */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav-padding {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+}
 ```
 
-Elementos que usam `safe-bottom`: `BottomNavigation`, `MobileDrawerWrapper` (sheet content).
+Elementos que usam safe-area: `BottomNavigation` (`.bottom-nav-padding`), `MobileDrawerWrapper`, FAB da Dashboard.
 
 ### 11.8 Utilities Mobile
 
 | Classe CSS | Uso | Definição |
 |---|---|---|
+| `.bottom-nav-padding` | Padding iOS-safe para BottomNavigation | CSS real com `@supports` + `env()` |
 | `.press-scale` | Feedback tátil em buttons/cards | `active:scale-[0.97] transition-transform` |
-| `.safe-bottom` | Padding para Home Indicator iOS | `padding-bottom: env(safe-area-inset-bottom)` |
+| `.safe-bottom` | Padding genérico para Home Indicator | `padding-bottom: env(safe-area-inset-bottom)` |
 | `.drag-handle` | Handle visual de bottom sheet | `w-8 h-1 rounded-full bg-zinc-300` |
 | `.hide-scrollbar` | Tab bars horizontais | Oculta scrollbar nativa mantendo scroll |
 
