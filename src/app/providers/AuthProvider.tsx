@@ -443,10 +443,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   const login = useCallback(() => {
-    // Redirect to our own Vercel serverless function instead of Supabase's OAuth.
-    // This makes Google's consent screen show our Vercel domain
-    // instead of the ugly Supabase hash URL.
-    window.location.href = '/api/auth/google';
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (isLocal) {
+      // Local development: Vercel serverless functions aren't available,
+      // fall back to Supabase's built-in OAuth
+      supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+    } else {
+      // Production (Vercel): use our custom OAuth flow via serverless functions.
+      // This makes Google's consent screen show our Vercel domain
+      // instead of the ugly Supabase hash URL.
+      window.location.href = '/api/auth/google';
+    }
   }, []);
 
   const loginWithPassword = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
