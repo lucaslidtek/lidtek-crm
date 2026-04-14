@@ -4,7 +4,8 @@ import { useStore } from '@/shared/lib/store';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import type { Project, Sprint, ProjectStage, SprintPriority } from '@/shared/types/models';
 import { Badge, ProjectTypeBadge } from '@/shared/components/ui/Badge';
-import { PROJECT_STAGES, getStageLabel, getStageColor } from '@/shared/lib/constants';
+import { PROJECT_STAGES, TASK_STATUSES, getStageLabel, getStageColor } from '@/shared/lib/constants';
+import type { TaskStatus } from '@/shared/types/models';
 import { Briefcase, ChevronDown, Plus, Check, Clock, Circle, CalendarDays, Trash2, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,7 +23,7 @@ const PRIORITY_CONFIG: Record<SprintPriority, { label: string; color: string; ic
 };
 
 export function ProjectListView({ projects, onProjectClick }: ProjectListViewProps) {
-  const { getUserById, createSprint, completeSprint, updateSprint, deleteSprint } = useStore();
+  const { getUserById, createSprint, completeSprint, updateSprint, deleteSprint, tasks, moveTaskStatus } = useStore();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const isMobile = useIsMobile();
 
@@ -237,6 +238,9 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
                             onUpdate={(updates) => updateSprint(sprint.id, updates)}
                             onDelete={() => deleteSprint(sprint.id)}
                             isMobile={isMobile}
+                            linkedTaskStatus={tasks.find(t => t.sprintId === sprint.id)?.status}
+                            linkedTaskId={tasks.find(t => t.sprintId === sprint.id)?.id}
+                            onTaskStatusChange={(taskId, status) => moveTaskStatus(taskId, status)}
                           />
                         ))
                       }
@@ -264,13 +268,16 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
 
 // ─── Sprint Row ───────────────────────────────────────
 
-function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile }: {
+function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile, linkedTaskStatus, linkedTaskId, onTaskStatusChange }: {
   sprint: Sprint;
   isActive: boolean;
   onComplete: () => void;
   onUpdate: (updates: Partial<Sprint>) => void;
   onDelete: () => void;
   isMobile: boolean;
+  linkedTaskStatus?: TaskStatus;
+  linkedTaskId?: string;
+  onTaskStatusChange?: (taskId: string, status: TaskStatus) => void;
 }) {
   const isCompleted = sprint.status === 'completed';
   const stageColor = getStageColor(PROJECT_STAGES, sprint.stage);
@@ -386,6 +393,71 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile 
     onUpdate({ dueDate: val || undefined });
   };
 
+  // --- Status popover (linked task status) ---
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [statusPickerPos, setStatusPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const statusBtnRef = useRef<HTMLButtonElement>(null);
+
+  const currentStatus = linkedTaskStatus ?? 'todo';
+  const statusCfg = TASK_STATUSES.find(s => s.id === currentStatus) ?? { id: 'todo', label: 'A Fazer', color: '#A3A3A3' };
+
+  const openStatusPicker = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isCompleted || !linkedTaskId) return;
+    if (statusBtnRef.current) {
+      const rect = statusBtnRef.current.getBoundingClientRect();
+      setStatusPickerPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setShowStatusPicker(prev => !prev);
+  }, [isCompleted, linkedTaskId]);
+
+  useEffect(() => {
+    if (!showStatusPicker) return;
+    const close = () => setShowStatusPicker(false);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [showStatusPicker]);
+
+  const selectStatus = (status: TaskStatus) => {
+    if (linkedTaskId && onTaskStatusChange) {
+      onTaskStatusChange(linkedTaskId, status);
+    }
+    setShowStatusPicker(false);
+  };
+
+  const statusPopover = showStatusPicker ? createPortal(
+    <div
+      className="fixed z-[9999] glass rounded-lg border border-border-subtle shadow-xl p-1 min-w-[140px] animate-fade-in"
+      style={{ top: statusPickerPos.top, left: statusPickerPos.left }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {TASK_STATUSES.map((s) => {
+        const isSelected = currentStatus === s.id;
+        return (
+          <button
+            key={s.id}
+            onClick={(e) => { e.stopPropagation(); selectStatus(s.id as TaskStatus); }}
+            className={cn(
+              'flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[10px] font-semibold transition-all cursor-pointer',
+              isSelected
+                ? 'bg-black/5 dark:bg-white/5 text-foreground'
+                : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
+            )}
+          >
+            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+            {s.label}
+            {isSelected && <Check className="w-3 h-3 ml-auto" />}
+          </button>
+        );
+      })}
+    </div>,
+    document.body
+  ) : null;
+
   if (isMobile) {
     return (
       <div className={cn(
@@ -482,6 +554,26 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile 
             {priorityPopover}
           </div>
           <Badge color={stageColor}>{stageLabel}</Badge>
+          {/* Task status — clickable popover */}
+          {linkedTaskId && !isCompleted && (
+            <div className="relative flex-shrink-0">
+              <button
+                ref={statusBtnRef}
+                onClick={openStatusPicker}
+                disabled={isCompleted}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider border transition-all cursor-pointer',
+                  'border-zinc-200 dark:border-zinc-700 hover:bg-black/5 dark:hover:bg-white/5',
+                  isCompleted && 'opacity-50 cursor-default',
+                )}
+              >
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: statusCfg.color }} />
+                {statusCfg.label}
+                <ChevronDown className={cn('w-2.5 h-2.5 transition-transform', showStatusPicker && 'rotate-180')} />
+              </button>
+              {statusPopover}
+            </div>
+          )}
           {/* Due date — custom DatePicker */}
           {!isCompleted && (
             <DatePicker
@@ -594,6 +686,27 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile 
 
       {/* Stage badge */}
       <Badge color={stageColor}>{stageLabel}</Badge>
+
+      {/* Task status — clickable popover */}
+      {linkedTaskId && !isCompleted && (
+        <div className="relative flex-shrink-0">
+          <button
+            ref={statusBtnRef}
+            onClick={openStatusPicker}
+            disabled={isCompleted}
+            className={cn(
+              'flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider border transition-all cursor-pointer',
+              'border-zinc-200 dark:border-zinc-700 hover:bg-black/5 dark:hover:bg-white/5',
+              isCompleted && 'opacity-50 cursor-default',
+            )}
+          >
+            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: statusCfg.color }} />
+            <span className="hidden sm:inline">{statusCfg.label}</span>
+            <ChevronDown className={cn('w-2.5 h-2.5 transition-transform', showStatusPicker && 'rotate-180')} />
+          </button>
+          {statusPopover}
+        </div>
+      )}
 
       {/* Dates */}
       <div className="flex items-center gap-3 text-[10px] text-foreground-muted flex-shrink-0">

@@ -533,13 +533,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const moveTaskStatus = useCallback(async (id: string, status: TaskStatus) => {
     try {
       const task = await api.tasks.updateStatus(id, status);
-      await refreshTasks();
+      // Bidirectional sync: if task is linked to a sprint, sync sprint status
+      const linkedTask = tasks.find(t => t.id === id);
+      if (linkedTask?.sprintId) {
+        const sprintStatusMap: Record<TaskStatus, string> = {
+          'todo': 'active',
+          'in_progress': 'active',
+          'done': 'completed',
+          'blocked': 'active',
+        };
+        const newSprintStatus = sprintStatusMap[status];
+        if (newSprintStatus === 'completed') {
+          await api.sprints.complete(linkedTask.sprintId);
+        } else {
+          await api.sprints.update(linkedTask.sprintId, { status: newSprintStatus as any });
+        }
+      }
+      await Promise.all([refreshTasks(), refreshProjects()]);
       return task;
     } catch (err) {
       console.error('[Store] moveTaskStatus failed:', err);
       throw err;
     }
-  }, [refreshTasks]);
+  }, [refreshTasks, refreshProjects, tasks]);
 
   const deleteTask = useCallback(async (id: string) => {
     try {
@@ -559,7 +575,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await api.tasks.create({
       title: data.name,
       type: 'project',
-      status: 'in_progress',
+      status: 'todo',
       priority: data.priority ?? 'medium',
       ownerIds: project?.ownerIds?.length ? project.ownerIds : [users[0]?.id || ''],
       tags: [],
@@ -573,8 +589,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateSprint = useCallback(async (sprintId: string, data: Partial<Sprint>) => {
     await api.sprints.update(sprintId, data);
-    await refreshProjects();
-  }, [refreshProjects]);
+    // Bidirectional sync: if status changed, sync the linked task
+    if (data.status) {
+      const linkedTask = tasks.find(t => t.sprintId === sprintId);
+      if (linkedTask) {
+        const taskStatusMap: Record<string, TaskStatus> = {
+          'active': 'in_progress',
+          'completed': 'done',
+        };
+        const newTaskStatus = taskStatusMap[data.status];
+        if (newTaskStatus && linkedTask.status !== newTaskStatus) {
+          await api.tasks.updateStatus(linkedTask.id, newTaskStatus);
+        }
+      }
+    }
+    await Promise.all([refreshProjects(), refreshTasks()]);
+  }, [refreshProjects, refreshTasks, tasks]);
 
   const completeSprint = useCallback(async (sprintId: string) => {
     await api.sprints.complete(sprintId);
