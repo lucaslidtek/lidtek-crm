@@ -3,19 +3,22 @@ import { AuthProvider } from '@/app/providers/AuthProvider';
 import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import { StoreProvider } from '@/shared/lib/store';
 import { PWAInstallPrompt } from '@/shared/components/PWAInstallPrompt';
+import { AppErrorBoundary } from './AppErrorBoundary';
 import { Router } from './Router';
 
 export function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <StoreProvider>
-          <SidebarProvider>
-            <Router />
-          </SidebarProvider>
-        </StoreProvider>
-      </AuthProvider>
-      <PWAInstallPrompt />
-    </ThemeProvider>
+    <AppErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <StoreProvider>
+            <SidebarProvider>
+              <Router />
+            </SidebarProvider>
+          </StoreProvider>
+        </AuthProvider>
+        <PWAInstallPrompt />
+      </ThemeProvider>
+    </AppErrorBoundary>
   );
 }

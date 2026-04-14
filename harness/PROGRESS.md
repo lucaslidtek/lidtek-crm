@@ -6,8 +6,8 @@
 
 ## Estado Atual do Projeto
 
-**Última atualização:** 2026-04-13 20:38 (BRT)
-**Sprint ativo:** S-PERF-01 (Performance Turbo)
+**Última atualização:** 2026-04-14 08:36 (BRT)
+**Sprint ativo:** S-PERF-02 (Hotfix: Black Screen)
 **Status geral:** ✅ Concluído
 
 ---
@@ -31,6 +31,26 @@ Na sessão de 2026-04-13 (noite), o app recebeu otimização de performance comp
 ---
 
 ## Sprints
+
+### Sprint S-PERF-02: Hotfix Black Screen — ✅ Concluído
+**Concluído em:** 2026-04-14
+**Causa raiz:** Cache de localStorage continha dados com schema antigo (`ownerId` em vez de `ownerIds` nas tasks). Ao hidratar o estado com esses dados corrompidos, o React crashava silenciosamente. A splash screen escura (`#0a0a0f`) ficava visível pra sempre = "tela preta".
+
+**Tarefas:**
+
+- [x] T-01: Cache versionado — `STORE_CACHE_VERSION = 2`, invalida cache com schema antigo
+- [x] T-02: `clearStoreCache()` exportada para uso em error boundaries
+- [x] T-03: `AppErrorBoundary` — captura crashes, limpa caches, mostra botão de reload
+- [x] T-04: Splash screen com recovery — timeout 8s mostra botão "Limpar e recarregar"
+- [x] T-05: ErrorBoundary integrado no App.tsx (wraps everything)
+- [x] T-06: Sensor build — build completa sem erros
+
+**Lições:**
+- Sempre versionar cache de localStorage quando schema de models mudar
+- Splash screen escura precisa de escape hatch visível
+- ErrorBoundary é obrigatório quando se usa cache persistence
+
+---
 
 ### Sprint S-PERF-01: Performance Turbo — ✅ Concluído
 **Concluído em:** 2026-04-13
@@ -111,7 +131,7 @@ Na sessão de 2026-04-13 (noite), o app recebeu otimização de performance comp
 ---
 
 ## Pendências Identificadas
-
+| 2026-04-14 (manhã) | Implementador | Hotfix tela preta: cache versionado, ErrorBoundary, splash recovery (T-01 a T-06) | pendente |
 > Coisas notadas durante implementação mas fora do escopo deste sprint.
 
 - [ ] 2026-04-13 — `ColumnManagerDialog.tsx(177)`: propriedade `ringColor` inválida no CSS-in-JS

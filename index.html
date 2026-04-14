@@ -33,48 +33,9 @@
     <meta name="twitter:image" content="/og-image.png" />
 
     <title>CRM — Lidtek Gestão de Projetos</title>
-
-    <!-- Inline splash screen — visible instantly before JS loads -->
-    <style>
-      .splash-screen {
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: #0a0a0f;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      }
-      .splash-logo {
-        font-size: 2rem;
-        font-weight: 700;
-        letter-spacing: 0.15em;
-        color: rgba(255,255,255,0.85);
-        margin-bottom: 1.5rem;
-      }
-      .splash-spinner {
-        width: 28px;
-        height: 28px;
-        border: 2.5px solid rgba(255,255,255,0.1);
-        border-top-color: rgba(255,255,255,0.5);
-        border-radius: 50%;
-        animation: splash-spin 0.7s linear infinite;
-      }
-      @keyframes splash-spin {
-        to { transform: rotate(360deg); }
-      }
-    </style>
   </head>
   <body>
-    <div id="root">
-      <!-- Splash screen: React.createRoot replaces this automatically on mount -->
-      <div class="splash-screen" aria-label="Carregando aplicação">
-        <div class="splash-logo">CRM</div>
-        <div class="splash-spinner"></div>
-      </div>
-    </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

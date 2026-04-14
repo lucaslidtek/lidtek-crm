@@ -70,6 +70,9 @@ type StoreContextType = StoreState & StoreActions;
 // TURBO: Persisted to localStorage so cold starts hydrate instantly.
 // ────────────────────────────────────────────
 const STORE_CACHE_KEY = 'lidtek-crm-store-cache';
+// Increment this whenever the data shape changes (e.g. ownerId → ownerIds)
+// to auto-invalidate stale caches that would crash the app.
+const STORE_CACHE_VERSION = 2;
 
 type CacheShape = {
   leads: Lead[];
@@ -79,26 +82,42 @@ type CacheShape = {
   funnelColumns: FunnelColumn[];
 };
 
+type PersistedCache = CacheShape & { _v?: number };
+
 function loadPersistedCache(): CacheShape | null {
   try {
     const raw = localStorage.getItem(STORE_CACHE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && Array.isArray(parsed.leads) && Array.isArray(parsed.projects)) {
+    const parsed: PersistedCache = JSON.parse(raw);
+    // Version mismatch → stale schema → discard
+    if (!parsed || parsed._v !== STORE_CACHE_VERSION) {
+      localStorage.removeItem(STORE_CACHE_KEY);
+      return null;
+    }
+    if (Array.isArray(parsed.leads) && Array.isArray(parsed.projects)) {
       return parsed;
     }
     return null;
   } catch {
+    localStorage.removeItem(STORE_CACHE_KEY);
     return null;
   }
 }
 
 function persistCache(cache: CacheShape) {
   try {
-    localStorage.setItem(STORE_CACHE_KEY, JSON.stringify(cache));
+    localStorage.setItem(STORE_CACHE_KEY, JSON.stringify({ ...cache, _v: STORE_CACHE_VERSION }));
   } catch {
     // localStorage full or unavailable
   }
+}
+
+/** Clear persisted store cache — used by error boundaries to recover from corrupted state. */
+export function clearStoreCache() {
+  try {
+    localStorage.removeItem(STORE_CACHE_KEY);
+    _cache = null;
+  } catch { /* noop */ }
 }
 
 // MODULE-LEVEL HMR CACHE
