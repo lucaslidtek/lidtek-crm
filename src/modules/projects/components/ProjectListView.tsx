@@ -6,7 +6,7 @@ import type { Project, Sprint, ProjectStage, SprintPriority } from '@/shared/typ
 import { Badge, ProjectTypeBadge } from '@/shared/components/ui/Badge';
 import { PROJECT_STAGES, TASK_STATUSES, getStageLabel, getStageColor } from '@/shared/lib/constants';
 import type { TaskStatus } from '@/shared/types/models';
-import { Briefcase, ChevronDown, Plus, Check, Clock, Circle, CalendarDays, Trash2, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react';
+import { Briefcase, ChevronDown, Plus, Check, Clock, CalendarDays, Trash2, ArrowUp, ArrowRight, ArrowDown } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DatePicker } from '@/shared/components/ui/DatePicker';
@@ -146,64 +146,80 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
                   <Briefcase className="w-4 h-4" />
                 </div>
 
-                {/* Client Name + Contact */}
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate cursor-pointer"
-                    onClick={(e) => { e.stopPropagation(); onProjectClick(project); }}
-                  >
-                    {project.clientName}
-                  </p>
-                  <p className="text-[11px] text-foreground-muted truncate">{project.clientContact}</p>
-                </div>
-
-                {/* Type Badge */}
-                <div className="flex-shrink-0">
-                  <ProjectTypeBadge type={project.type} />
-                </div>
-
-                {/* Current Sprint (main highlight) */}
-                <div className="flex-shrink-0 max-w-[220px] min-w-[140px]">
-                  {currentSprint ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
-                      <span className="text-xs font-medium text-foreground truncate">{currentSprint.name}</span>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-foreground-muted/50">Sem sprint ativa</span>
-                  )}
-                </div>
-
-                {/* Sprint Counter */}
-                <div className="flex-shrink-0 flex items-center gap-1.5 text-xs text-foreground-muted">
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5">
-                    <Check className="w-3 h-3 text-emerald-500" />
-                    <span className="font-medium">{completedCount}</span>
-                    <span className="text-foreground-muted/50">/</span>
-                    <span>{project.sprints.length}</span>
+                {/* 2-Line Layout Container */}
+                <div className="flex flex-col gap-1 flex-1 min-w-0">
+                  {/* Line 1: Name & Type */}
+                  <div className="flex items-center gap-2">
+                    <p
+                      className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); onProjectClick(project); }}
+                    >
+                      {project.clientName}
+                    </p>
+                    <ProjectTypeBadge type={project.type} />
                   </div>
-                </div>
 
-                {/* Owners */}
-                <div className="flex-shrink-0 flex items-center gap-1.5">
-                  <div className="flex items-center -space-x-1.5">
-                    {owners.slice(0, 3).map((o, i) => (
-                      <div key={i} className="w-6 h-6 rounded-md bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border-2 border-white dark:border-zinc-900" title={o!.name}>
-                        {o!.initials}
+                  {/* Line 2: Contact, Active Sprint, Metric */}
+                  <div className="flex items-center flex-wrap gap-2 text-[11.5px] text-foreground-muted truncate">
+                    {project.clientContact && (
+                      <>
+                        <span className="truncate max-w-[120px]">{project.clientContact}</span>
+                        <span>•</span>
+                      </>
+                    )}
+                    
+                    {/* Current Sprint */}
+                    {currentSprint ? (
+                      <div className="flex items-center gap-1.5 max-w-[200px] truncate">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
+                        <span className="font-medium text-foreground truncate">{currentSprint.name}</span>
                       </div>
-                    ))}
-                    {owners.length > 3 && (
-                      <div className="w-6 h-6 rounded-md bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-foreground-muted border-2 border-white dark:border-zinc-900">
-                        +{owners.length - 3}
-                      </div>
+                    ) : (
+                      <span className="opacity-50">Sem sprint ativa</span>
+                    )}
+                    <span>•</span>
+
+                    {/* Counter */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                       <Check className="w-3 h-3 text-emerald-500" />
+                       <span className="font-medium">{completedCount}</span>
+                       <span className="opacity-50">/</span>
+                       <span>{project.sprints.length} sprints</span>
+                    </div>
+
+                    {/* Move Owners here! */}
+                    {owners.length > 0 && (
+                      <>
+                        <span>•</span>
+                        <div className="flex items-center -space-x-1 flex-shrink-0">
+                          {owners.slice(0, 3).map((o, i) => (
+                            <div key={i} className="w-[18px] h-[18px] rounded-md bg-primary/20 flex items-center justify-center text-[8px] font-bold text-primary border border-white dark:border-zinc-900" title={o!.name}>
+                              {o!.initials}
+                            </div>
+                          ))}
+                          {owners.length > 3 && (
+                            <div className="w-[18px] h-[18px] rounded-md bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[8px] font-bold text-foreground-muted border border-white dark:border-zinc-900">
+                              +{owners.length - 3}
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
-                  {owners.length === 1 && (
-                    <span className="text-[11px] text-foreground-muted hidden lg:inline">{owners[0]?.name?.split(' ')[0]}</span>
-                  )}
-                  {owners.length === 0 && (
-                    <span className="text-[11px] text-foreground-muted/40 hidden lg:inline italic">Sem resp.</span>
-                  )}
+                </div>
+
+                {/* New: Progress Bar (Anchored Right) */}
+                <div className="flex-shrink-0 w-28 hidden md:flex flex-col gap-1 mx-2">
+                  <div className="flex justify-between items-center text-[9px] font-semibold text-foreground-muted uppercase tracking-wider">
+                    <span>Progresso</span>
+                    <span>{project.sprints.length ? Math.round((completedCount / project.sprints.length) * 100) : 0}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-black/5 dark:bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out" 
+                      style={{ width: `${project.sprints.length ? Math.round((completedCount / project.sprints.length) * 100) : 0}%` }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -527,12 +543,6 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
 
         {/* Row 2: badges + date */}
         <div className="flex items-center gap-1.5 mt-1.5 ml-[30px] flex-wrap">
-          {isActive && !isCompleted && (
-            <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
-              <Circle className="w-2 h-2 fill-current" />
-              Ativa
-            </div>
-          )}
           {/* Priority — custom popover (portal) */}
           <div className="relative flex-shrink-0">
             <button
@@ -597,144 +607,147 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
 
   return (
     <div className={cn(
-      'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group/sprint',
+      'flex flex-col gap-1 px-3 py-2.5 rounded-lg transition-all duration-200 group/sprint',
       isActive
         ? 'bg-violet-50/80 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/30'
         : isCompleted
           ? 'opacity-60 hover:opacity-80'
           : 'hover:bg-black/5 dark:hover:bg-white/5',
     )}>
-      {/* Checkbox */}
-      <button
-        onClick={handleComplete}
-        disabled={isCompleted || completing}
-        className={cn(
-          'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all cursor-pointer border',
-          isCompleted
-            ? 'bg-emerald-500 border-emerald-500 text-white'
-            : 'border-zinc-300 dark:border-zinc-600 hover:border-primary dark:hover:border-primary',
-          completing && 'animate-pulse',
-        )}
-      >
-        {isCompleted && <Check className="w-3 h-3" />}
-      </button>
-
-      {/* Sprint name (double-click to edit) */}
-      {editing ? (
-        <input
-          ref={inputRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commitRename}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitRename();
-            if (e.key === 'Escape') cancelRename();
-          }}
-          className="text-sm font-medium flex-1 min-w-0 bg-transparent outline-none border-b border-primary/40 focus:border-primary text-foreground py-0.5 transition-colors"
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        <span
-          className={cn(
-            'text-sm flex-1 min-w-0 truncate',
-            isCompleted
-              ? 'line-through text-foreground-muted'
-              : 'font-medium text-foreground',
-            !isCompleted && 'cursor-text hover:text-primary/80 transition-colors',
-          )}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            if (!isCompleted) {
-              setDraft(sprint.name);
-              setEditing(true);
-            }
-          }}
-          title="Duplo clique para editar"
-        >
-          {sprint.name}
-        </span>
-      )}
-
-      {/* Status indicator */}
-      {isActive && !isCompleted && (
-        <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
-          <Circle className="w-2.5 h-2.5 fill-current" />
-          Em andamento
-        </div>
-      )}
-
-      {/* Priority — custom popover (portal) */}
-      <div className="relative flex-shrink-0">
+      {/* Line 1: Identity & Actions */}
+      <div className="flex items-center gap-3">
+        {/* Checkbox */}
         <button
-          ref={priorityBtnRef}
-          onClick={openPriorityPicker}
-          disabled={isCompleted}
+          onClick={handleComplete}
+          disabled={isCompleted || completing}
           className={cn(
-            'flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider border transition-all cursor-pointer',
-            currentPriority === 'high' && 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30',
-            currentPriority === 'medium' && 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30',
-            currentPriority === 'low' && 'text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30',
-            isCompleted && 'opacity-50 cursor-default',
+            'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all cursor-pointer border',
+            isCompleted
+              ? 'bg-emerald-500 border-emerald-500 text-white'
+              : 'border-zinc-300 dark:border-zinc-600 hover:border-primary dark:hover:border-primary',
+            completing && 'animate-pulse',
           )}
         >
-          <PriorityIcon className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">{priorityCfg.label}</span>
-          <ChevronDown className={cn('w-2.5 h-2.5 transition-transform', showPriorityPicker && 'rotate-180')} />
+          {isCompleted && <Check className="w-3 h-3" />}
         </button>
-        {priorityPopover}
-      </div>
 
-      {/* Stage badge */}
-      <Badge color={stageColor}>{stageLabel}</Badge>
-
-      {/* Task status — clickable popover */}
-      {linkedTaskId && !isCompleted && (
-        <div className="relative flex-shrink-0">
-          <button
-            ref={statusBtnRef}
-            onClick={openStatusPicker}
-            disabled={isCompleted}
-            className={cn(
-              'flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wider border transition-all cursor-pointer',
-              'border-zinc-200 dark:border-zinc-700 hover:bg-black/5 dark:hover:bg-white/5',
-              isCompleted && 'opacity-50 cursor-default',
-            )}
-          >
-            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: statusCfg.color }} />
-            <span className="hidden sm:inline">{statusCfg.label}</span>
-            <ChevronDown className={cn('w-2.5 h-2.5 transition-transform', showStatusPicker && 'rotate-180')} />
-          </button>
-          {statusPopover}
-        </div>
-      )}
-
-      {/* Dates */}
-      <div className="flex items-center gap-3 text-[10px] text-foreground-muted flex-shrink-0">
-        {!isCompleted && (
-          <DatePicker
-            value={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : undefined}
-            onChange={handleDateChange}
-            disabled={isCompleted}
-            variant={sprint.dueDate && new Date(sprint.dueDate) < new Date() ? 'badge-overdue' : sprint.dueDate ? 'badge-upcoming' : 'compact'}
-            placeholder="+ Prazo"
+        {/* Sprint name (double-click to edit) */}
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitRename();
+              if (e.key === 'Escape') cancelRename();
+            }}
+            className="text-sm font-medium flex-1 min-w-0 bg-transparent outline-none border-b border-primary/40 focus:border-primary text-foreground py-0.5 transition-colors"
+            onClick={(e) => e.stopPropagation()}
           />
-        )}
-        {sprint.endDate && (
-          <span className="flex items-center gap-1 text-emerald-500" title="Data de conclusão">
-            <Check className="w-3 h-3" />
-            {new Date(sprint.endDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+        ) : (
+          <span
+            className={cn(
+              'text-sm flex-1 min-w-0 truncate',
+              isCompleted
+                ? 'line-through text-foreground-muted'
+                : 'font-medium text-foreground',
+              !isCompleted && 'cursor-text hover:text-primary/80 transition-colors',
+            )}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              if (!isCompleted) {
+                setDraft(sprint.name);
+                setEditing(true);
+              }
+            }}
+            title="Duplo clique para editar"
+          >
+            {sprint.name}
           </span>
         )}
+
+        {/* Delete button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-0 group-hover/sprint:opacity-100 transition-all cursor-pointer"
+          title="Excluir sprint"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
       </div>
 
-      {/* Delete button */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-0 group-hover/sprint:opacity-100 transition-all cursor-pointer"
-        title="Excluir sprint"
-      >
-        <Trash2 className="w-3 h-3" />
-      </button>
+      {/* Line 2: Metadata (Status, Priority, Stage, Dates) */}
+      <div className="flex items-center ml-[32px] flex-wrap">
+        {/* Left side: Badges */}
+        <div className="flex items-center gap-2 flex-grow">
+          {/* Task status — clickable popover */}
+          {linkedTaskId && !isCompleted && (
+            <div className="relative flex-shrink-0">
+              <button
+                ref={statusBtnRef}
+                onClick={openStatusPicker}
+                disabled={isCompleted}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider border transition-all cursor-pointer',
+                  'border-zinc-200 dark:border-zinc-700 hover:bg-black/5 dark:hover:bg-white/5',
+                  isCompleted && 'opacity-50 cursor-default',
+                )}
+              >
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: statusCfg.color }} />
+                <span className="hidden sm:inline">{statusCfg.label}</span>
+                <ChevronDown className={cn('w-2.5 h-2.5 transition-transform', showStatusPicker && 'rotate-180')} />
+              </button>
+              {statusPopover}
+            </div>
+          )}
+
+          {/* Priority — custom popover (portal) */}
+          <div className="relative flex-shrink-0">
+            <button
+              ref={priorityBtnRef}
+              onClick={openPriorityPicker}
+              disabled={isCompleted}
+              className={cn(
+                'flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider border transition-all cursor-pointer',
+                currentPriority === 'high' && 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30',
+                currentPriority === 'medium' && 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30',
+                currentPriority === 'low' && 'text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30',
+                isCompleted && 'opacity-50 cursor-default',
+              )}
+            >
+              <PriorityIcon className="w-3 h-3" />
+              <span className="hidden sm:inline">{priorityCfg.label}</span>
+              <ChevronDown className={cn('w-2.5 h-2.5 transition-transform', showPriorityPicker && 'rotate-180')} />
+            </button>
+            {priorityPopover}
+          </div>
+
+          {/* Stage badge - adjusted down scale slightly to match new priority size */}
+          <div className="scale-90 origin-left flex-shrink-0">
+            <Badge color={stageColor}>{stageLabel}</Badge>
+          </div>
+        </div>
+
+        {/* Right side: Dates */}
+        <div className="flex items-center gap-3 text-[10px] text-foreground-muted flex-shrink-0 ml-auto pr-8">
+          {!isCompleted && (
+            <DatePicker
+              value={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : undefined}
+              onChange={handleDateChange}
+              disabled={isCompleted}
+              variant={sprint.dueDate && new Date(sprint.dueDate) < new Date() ? 'badge-overdue' : sprint.dueDate ? 'badge-upcoming' : 'compact'}
+              placeholder="+ Prazo"
+            />
+          )}
+          {sprint.endDate && (
+            <span className="flex items-center gap-1 text-emerald-500" title="Data de conclusão">
+              <Check className="w-3 h-3" />
+              {new Date(sprint.endDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

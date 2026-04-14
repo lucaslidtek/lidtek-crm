@@ -56,7 +56,6 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
   const editable = true;
   const stageColor = lead ? getStageColor(funnelColumns, lead.stage) : '#A3A3A3';
   const stageLabel = lead ? getStageLabel(funnelColumns, lead.stage) : '';
-  const isOverdue = lead?.nextContactDate && new Date(lead.nextContactDate) < new Date();
   const linkedProject = lead ? projects.find(p => p.leadId === lead.id) : undefined;
   const hasProject = !!linkedProject;
   const canConvert = lead ? (lead.stage === 'contract_signed' || lead.stage === 'contract_sent') && !hasProject : false;

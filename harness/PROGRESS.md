@@ -156,6 +156,7 @@ Na sessão de 2026-04-13 (noite), o app recebeu otimização de performance comp
 | 2026-04-13 (manhã) | Implementador | Persistência de dados (T-01 a T-07) + Segurança whitelist (T-08 a T-18) + Docs (T-19, T-20) | pendente |
 | 2026-04-13 (tarde) | Implementador | PWA completo: plugin, ícones, manifest, SW, install prompt (T-01 a T-07) | pendente |
 | 2026-04-13 (noite) | Implementador | Performance Turbo: splash, cache-first auth, lazy routes, store persistence, API parallel (T-01 a T-06) | pendente |
+| 2026-04-14 | Implementador | Padronização dos avatares (Google profile photo default + component. UserAvatar DRY) | pendente |
 
 ---
 
