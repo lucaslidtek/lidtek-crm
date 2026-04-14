@@ -55,17 +55,17 @@ export function BottomNavigation() {
             key={item.path}
             onClick={() => setLocation(item.path)}
             className={cn(
-              'relative flex flex-col items-center justify-center gap-0.5',
-              'min-w-[48px] min-h-[48px] px-2 py-1',
+              'relative flex flex-1 flex-col items-center justify-center gap-0.5',
+              'min-h-[48px] py-1',
               'press-scale',
             )}
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
-            {/* Active background glow/indicator */}
+            {/* Active background — fills entire tab area */}
             {isActive && (
               <motion.div
                 layoutId="bottomNavIndicator"
-                className="absolute inset-1 bg-primary/10 rounded-xl"
+                className="absolute inset-0 bg-primary/10"
                 transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
               />
             )}
