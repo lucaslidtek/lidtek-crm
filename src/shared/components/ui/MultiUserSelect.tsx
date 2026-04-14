@@ -117,8 +117,13 @@ export function MultiUserSelect({
             left: dropdownPos.left,
             width: dropdownPos.width,
             zIndex: 9999,
+            pointerEvents: 'auto',
           }}
           className="py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl shadow-black/15 max-h-48 overflow-y-auto animate-in fade-in-0 zoom-in-95 duration-150"
+          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onWheel={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
         >
           {users.map(user => {
             const isSelected = selectedIds.includes(user.id);

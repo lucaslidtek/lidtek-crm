@@ -166,6 +166,7 @@ export function TasksKanban() {
                     task={task}
                     onEdit={setEditingTask}
                     onDelete={setDeletingTask}
+                    showStatusChip
                   />
                 </div>
               ))

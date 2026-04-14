@@ -1,22 +1,30 @@
 import { Briefcase, Calendar, Pencil, Trash2, User } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { PriorityBadge, TaskTypeBadge, Badge } from '@/shared/components/ui/Badge';
+import { StatusChip } from '@/modules/tasks/components/StatusChip';
 import { useStore } from '@/shared/lib/store';
-import type { Task } from '@/shared/types/models';
+import type { Task, TaskStatus } from '@/shared/types/models';
 
 interface TaskCardProps {
   task: Task;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  /** If true, show the interactive StatusChip (used in list/cell view) */
+  showStatusChip?: boolean;
 }
 
-export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
-  const { getUserById, leads, projects } = useStore();
+export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: TaskCardProps) {
+  const { getUserById, leads, projects, moveTaskStatus } = useStore();
   const owners = (task.ownerIds ?? []).map(id => getUserById(id)).filter(Boolean);
 
   // Overdue logic
   const now = Date.now();
-  const dueTime = task.dueDate ? new Date(task.dueDate).getTime() : null;
+  let safeDateStr = task.dueDate;
+  if (safeDateStr) {
+    const rawDate = safeDateStr.split('T')[0];
+    safeDateStr = rawDate + 'T12:00:00';
+  }
+  const dueTime = safeDateStr ? new Date(safeDateStr).getTime() : null;
   const isOverdue = dueTime && dueTime < now && task.status !== 'done';
   const isDueSoon = dueTime && !isOverdue && (dueTime - now) < 48 * 3600000 && task.status !== 'done';
 
@@ -32,6 +40,10 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
     linkedName = lead?.name ?? '';
     linkedType = 'lead';
   }
+
+  const handleStatusChange = (newStatus: TaskStatus) => {
+    moveTaskStatus(task.id, newStatus);
+  };
 
   return (
     <div className={cn(
@@ -63,9 +75,9 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
         </div>
       )}
 
-      {/* Linked entity — prominent chip at top */}
+      {/* Top row: linked entity */}
       {linkedName && linkedType && (
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 pr-16 sm:pr-0">
           <div className={cn(
             'flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium truncate max-w-full',
             linkedType === 'project'
@@ -88,6 +100,9 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
 
       {/* Badges */}
       <div className="flex items-center gap-1.5 flex-wrap">
+        {showStatusChip && (
+          <StatusChip status={task.status} onStatusChange={handleStatusChange} />
+        )}
         <PriorityBadge priority={task.priority} />
         <TaskTypeBadge type={task.type} />
         {isOverdue && <Badge variant="blocked">Atrasada</Badge>}
@@ -135,7 +150,7 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
             isOverdue ? 'text-destructive font-semibold' : isDueSoon ? 'text-warning font-semibold' : 'text-foreground-muted',
           )}>
             <Calendar className="w-3 h-3" />
-            {new Date(task.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+            {new Date(safeDateStr as string).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
           </div>
         )}
       </div>

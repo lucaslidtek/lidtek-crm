@@ -21,6 +21,9 @@ function formatSupabaseError(operation: string, error: { message: string; code?:
   if (msg.includes('0 rows') || msg.includes('no rows') || msg.includes('json object requested, multiple (or no) rows returned')) {
     return `${operation}: Operação não retornou dados. Possível bloqueio de RLS — verifique as políticas de acesso no Supabase.`;
   }
+  if (msg.includes('owner_ids') && msg.includes('does not exist')) {
+    return `Erro de Banco de Dados: A coluna 'owner_ids' não existe na tabela. Por favor, rode a migração SQL informada no painel do Supabase.`;
+  }
   return `${operation}: ${error.message}`;
 }
 

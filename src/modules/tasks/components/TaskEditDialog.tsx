@@ -57,13 +57,13 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
     try {
       await updateTask(task.id, {
         title: title.trim(),
-        description: description.trim() || undefined,
+        description: description.trim() || (null as any),
         type,
         priority,
         ownerIds,
-        dueDate: dueDate || undefined,
-        projectId: type === 'project' && projectId ? projectId : undefined,
-        leadId: type === 'sales' && leadId ? leadId : undefined,
+        dueDate: dueDate || (null as any),
+        projectId: type === 'project' && projectId ? projectId : (null as any),
+        leadId: type === 'sales' && leadId ? leadId : (null as any),
       });
       onOpenChange(false);
     } catch (err) {

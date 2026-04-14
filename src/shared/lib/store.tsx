@@ -521,7 +521,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateTask = useCallback(async (id: string, data: Partial<Task>) => {
     try {
-      const task = await api.tasks.update(id, data);
+      const task = await Promise.race([
+        api.tasks.update(id, data),
+        new Promise<Task>((_, reject) => 
+          setTimeout(() => reject(new Error('A requisição para o banco de dados demorou muito tempo (Timeout). A conexão com a internet caiu ou há um bloqueio SQL.')), 10000)
+        )
+      ]);
       await refreshTasks();
       return task;
     } catch (err) {
