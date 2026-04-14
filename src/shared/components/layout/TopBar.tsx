@@ -39,7 +39,7 @@ export function TopBar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border-subtle h-14 md:h-16 flex items-center justify-between px-4 md:px-6 pt-[max(env(safe-area-inset-top),0px)]">
+    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border-subtle min-h-14 md:min-h-16 flex items-center justify-between px-4 md:px-6 topbar-safe-top">
 
       {/* ─── DESKTOP LEFT ─── */}
       <div className="hidden md:flex items-center">

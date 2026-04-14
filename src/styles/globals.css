@@ -272,25 +272,42 @@
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
 }
 
-/* Bottom Navigation — real CSS class (NOT @utility) for iOS safe area.
+/* ═══ iOS Safe Area — real CSS classes (NOT @utility) ═══
    @utility gets compiled by Tailwind and may strip env().
-   This uses progressive enhancement + iOS constant() fallback. */
-.bottom-nav-padding {
-  padding-top: 0.625rem;
-  padding-bottom: 0.75rem;
+   These use progressive enhancement + iOS constant() fallback. */
+
+/* ── TopBar: push content below status bar / notch / dynamic island ── */
+.topbar-safe-top {
+  padding-top: 0.5rem;
 }
 
-/* iOS 11.0-11.1 used constant() instead of env() */
-@supports (padding-bottom: constant(safe-area-inset-bottom)) {
-  .bottom-nav-padding {
-    padding-bottom: calc(0.75rem + constant(safe-area-inset-bottom));
+@supports (padding-top: constant(safe-area-inset-top)) {
+  .topbar-safe-top {
+    padding-top: calc(0.5rem + constant(safe-area-inset-top));
   }
 }
 
-/* iOS 11.2+ and all modern browsers */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .topbar-safe-top {
+    padding-top: calc(0.5rem + env(safe-area-inset-top));
+  }
+}
+
+/* ── Bottom Navigation: push content above home indicator ── */
+.bottom-nav-padding {
+  padding-top: 0.625rem;
+  padding-bottom: 1rem;
+}
+
+@supports (padding-bottom: constant(safe-area-inset-bottom)) {
+  .bottom-nav-padding {
+    padding-bottom: calc(1rem + constant(safe-area-inset-bottom));
+  }
+}
+
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .bottom-nav-padding {
-    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   }
 }
 
