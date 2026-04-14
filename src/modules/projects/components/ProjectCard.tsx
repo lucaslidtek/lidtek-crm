@@ -1,6 +1,7 @@
 import { Calendar } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { ProjectTypeBadge } from '@/shared/components/ui/Badge';
+import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import { useStore } from '@/shared/lib/store';
 import type { Project } from '@/shared/types/models';
 
@@ -38,12 +39,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
         {owners.length > 0 ? (
           <div className="flex items-center -space-x-1.5">
             {owners.slice(0, 3).map((owner, i) => (
-              <div key={i} className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center border-2 border-white dark:border-zinc-900 cursor-default" title={owner!.name}>
-                {owner!.avatarUrl ? (
-                  <img src={owner!.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
-                ) : (
-                  <span className="text-[9px] font-bold text-primary">{owner!.initials}</span>
-                )}
+              <div key={i} className="border-2 border-white dark:border-zinc-900 rounded-full" title={owner!.name}>
+                <UserAvatar
+                  name={owner!.name}
+                  initials={owner!.initials}
+                  avatarUrl={owner!.avatarUrl}
+                  size="sm"
+                />
               </div>
             ))}
             {owners.length > 3 && (

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { Button } from '@/shared/components/ui/Button';
+import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import { MobileDrawerWrapper } from '@/shared/components/layout/MobileDrawerWrapper';
 import { useStore } from '@/shared/lib/store';
 import type { User, UserRole } from '@/shared/types/models';
@@ -37,18 +38,7 @@ const ROLE_CONFIG: Record<string, { label: string; icon: typeof Crown; color: st
 
 const ROLES: UserRole[] = ['admin', 'manager', 'collaborator', 'readonly'];
 
-function getAvatarGradient(initials: string): string {
-  const gradients = [
-    'from-primary/80 to-blue-light/80',
-    'from-blue-light/80 to-primary/80',
-    'from-primary/70 to-success/60',
-    'from-success/70 to-blue-light/70',
-    'from-warning/70 to-primary/60',
-    'from-primary/60 to-primary-light/80',
-  ];
-  const index = (initials.charCodeAt(0) + (initials.charCodeAt(1) || 0)) % gradients.length;
-  return gradients[index]!;
-}
+
 
 /* ═══ Section container (GitLab-style) ═══ */
 function Section({ title, icon, children }: {
@@ -203,7 +193,6 @@ export function MemberDetailDrawer({ member, onClose }: MemberDetailDrawerProps)
   // Null-safe derived state
   const roleConfig = member ? (ROLE_CONFIG[member.role] ?? ROLE_CONFIG.collaborator!) : ROLE_CONFIG.collaborator!;
   const RoleIcon = roleConfig.icon;
-  const gradient = member ? getAvatarGradient(member.initials) : 'from-zinc-400 to-zinc-600';
   const assignedProjects = member ? projects.filter((p) => p.ownerIds.includes(member.id)).length : 0;
   const assignedTasks = member ? tasks.filter((t) => t.ownerIds.includes(member.id)).length : 0;
 
@@ -255,26 +244,13 @@ export function MemberDetailDrawer({ member, onClose }: MemberDetailDrawerProps)
 
               {/* Avatar + Name */}
               <div className="flex items-center gap-3">
-                {member.avatarUrl ? (
-                  <img
-                    src={member.avatarUrl}
-                    alt={member.name}
-                    className="w-12 h-12 rounded-xl object-cover ring-2 ring-white/20 flex-shrink-0"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div
-                    className={cn(
-                      'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
-                      'bg-gradient-to-br shadow-md',
-                      gradient
-                    )}
-                  >
-                    <span className="text-lg font-bold text-white drop-shadow-sm">
-                      {member.initials}
-                    </span>
-                  </div>
-                )}
+                <UserAvatar
+                  name={member.name}
+                  initials={member.initials}
+                  avatarUrl={member.avatarUrl}
+                  size="lg"
+                  className="w-12 h-12 rounded-xl"
+                />
                 <div className="min-w-0 flex-1">
                   {editingName ? (
                     <div className="flex items-center gap-1.5">

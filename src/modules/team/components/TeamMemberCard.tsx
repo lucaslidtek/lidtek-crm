@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Mail, Phone, Briefcase } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
-
+import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import type { User, UserRole } from '@/shared/types/models';
 
 interface TeamMemberCardProps {
@@ -18,23 +18,8 @@ const ROLE_CONFIG: Record<UserRole, { label: string; color: string; bg: string }
   leitura: { label: 'Leitura', color: 'text-muted-foreground', bg: 'bg-muted/50' },
 };
 
-// Generate a stable gradient based on user initials
-function getAvatarGradient(initials: string): string {
-  const gradients = [
-    'from-primary/80 to-blue-light/80',
-    'from-blue-light/80 to-primary/80',
-    'from-primary/70 to-success/60',
-    'from-success/70 to-blue-light/70',
-    'from-warning/70 to-primary/60',
-    'from-primary/60 to-primary-light/80',
-  ];
-  const index = (initials.charCodeAt(0) + (initials.charCodeAt(1) || 0)) % gradients.length;
-  return gradients[index]!;
-}
-
 export function TeamMemberCard({ member, onClick }: TeamMemberCardProps) {
   const roleConfig = ROLE_CONFIG[member.role];
-  const gradient = getAvatarGradient(member.initials);
 
   return (
     <motion.button
@@ -58,26 +43,13 @@ export function TeamMemberCard({ member, onClick }: TeamMemberCardProps) {
       <div className="relative flex flex-col items-center text-center">
         {/* Avatar */}
         <div className="relative mb-4">
-          {member.avatarUrl ? (
-            <img
-              src={member.avatarUrl}
-              alt={member.name}
-              className="w-16 h-16 rounded-2xl object-cover ring-2 ring-white/20"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div
-              className={cn(
-                'w-16 h-16 rounded-2xl flex items-center justify-center',
-                'bg-gradient-to-br',
-                gradient
-              )}
-            >
-              <span className="text-lg font-bold text-white">
-                {member.initials}
-              </span>
-            </div>
-          )}
+          <UserAvatar
+            name={member.name}
+            initials={member.initials}
+            avatarUrl={member.avatarUrl}
+            size="lg"
+            className="w-16 h-16 rounded-2xl"
+          />
           {/* Online indicator */}
           {member.status === 'active' && (
             <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-success border-2 border-white dark:border-zinc-900" />

@@ -4,6 +4,7 @@ import { X, Check, Clock, Calendar, Briefcase, Tag, Layers, Trash2, Pencil, Chec
 import { WhatsAppIcon } from '@/shared/components/icons/WhatsAppIcon';
 import { cn } from '@/shared/utils/cn';
 import { ProjectTypeBadge, Badge } from '@/shared/components/ui/Badge';
+import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import { MobileDrawerWrapper } from '@/shared/components/layout/MobileDrawerWrapper';
 import { useStore } from '@/shared/lib/store';
 import { usePermissions } from '@/shared/hooks/usePermissions';
@@ -372,12 +373,13 @@ function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
           <>
             <div className="flex items-center -space-x-1">
               {owners.map((owner, i) => (
-                <div key={i} className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center border-2 border-white dark:border-zinc-900 overflow-hidden flex-shrink-0" title={owner!.name}>
-                  {owner!.avatarUrl ? (
-                    <img src={owner!.avatarUrl} className="w-full h-full rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
-                  ) : (
-                    <span className="text-[7px] font-bold text-primary">{owner!.initials}</span>
-                  )}
+                <div key={i} className="border-2 border-white dark:border-zinc-900 rounded-full" title={owner!.name}>
+                  <UserAvatar
+                    name={owner!.name}
+                    initials={owner!.initials}
+                    avatarUrl={owner!.avatarUrl}
+                    size="xs"
+                  />
                 </div>
               ))}
             </div>
@@ -415,13 +417,12 @@ function MultiOwnerSelect({ ownerIds, users, getUserById, onSave }: {
                 )}>
                   {isSelected && <Check className="w-2.5 h-2.5" />}
                 </div>
-                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  {u.avatarUrl ? (
-                    <img src={u.avatarUrl} className="w-full h-full rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
-                  ) : (
-                    <span className="text-[8px] font-bold text-primary">{u.initials}</span>
-                  )}
-                </div>
+                <UserAvatar
+                  name={u.name}
+                  initials={u.initials}
+                  avatarUrl={u.avatarUrl}
+                  size="xs"
+                />
                 <span className="text-zinc-700 dark:text-zinc-300 truncate">{u.name}</span>
               </button>
             );

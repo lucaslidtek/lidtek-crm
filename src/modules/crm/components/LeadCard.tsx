@@ -1,5 +1,6 @@
 import { Calendar, Repeat, Zap } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
+import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import type { Lead } from '@/shared/types/models';
 import { useStore } from '@/shared/lib/store';
 import { BILLING_TYPES, BILLING_CYCLES, getStageLabel } from '@/shared/lib/constants';
@@ -65,13 +66,12 @@ export function LeadCard({ lead }: LeadCardProps) {
         {/* Owner */}
         {owner && (
           <div className="relative" title={owner.name}>
-            <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center cursor-default">
-              {owner.avatarUrl ? (
-                <img src={owner.avatarUrl} className="w-6 h-6 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
-              ) : (
-                <span className="text-[9px] font-bold text-primary">{owner.initials}</span>
-              )}
-            </div>
+            <UserAvatar
+              name={owner.name}
+              initials={owner.initials}
+              avatarUrl={owner.avatarUrl}
+              size="sm"
+            />
           </div>
         )}
 
