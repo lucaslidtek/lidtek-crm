@@ -272,11 +272,26 @@
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
 }
 
-/* Bottom Navigation — explicit safe area handling for iOS */
-@utility bottom-nav-safe {
-  padding-top: 0.625rem; /* 10px */
-  padding-bottom: 0.75rem; /* 12px base */
-  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+/* Bottom Navigation — real CSS class (NOT @utility) for iOS safe area.
+   @utility gets compiled by Tailwind and may strip env().
+   This uses progressive enhancement + iOS constant() fallback. */
+.bottom-nav-padding {
+  padding-top: 0.625rem;
+  padding-bottom: 0.75rem;
+}
+
+/* iOS 11.0-11.1 used constant() instead of env() */
+@supports (padding-bottom: constant(safe-area-inset-bottom)) {
+  .bottom-nav-padding {
+    padding-bottom: calc(0.75rem + constant(safe-area-inset-bottom));
+  }
+}
+
+/* iOS 11.2+ and all modern browsers */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav-padding {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* Drag handle indicator inside bottom sheets */
