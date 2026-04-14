@@ -29,7 +29,6 @@ export function BottomNavigation() {
   const [location, setLocation] = useLocation();
   const { canEditAll } = usePermissions();
 
-  // Filter items by permission — Team only visible for admin/manager
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.requiresAdmin || canEditAll
   );
@@ -38,9 +37,9 @@ export function BottomNavigation() {
     <nav
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50',
-        'glass flex items-center justify-around',
+        'glass border-t border-border-subtle md:hidden',
         'bottom-nav-padding',
-        'border-t border-border-subtle md:hidden'
+        'flex items-center gap-1 px-2 py-2',
       )}
     >
       {visibleItems.map((item) => {
@@ -55,24 +54,23 @@ export function BottomNavigation() {
             key={item.path}
             onClick={() => setLocation(item.path)}
             className={cn(
-              'relative flex flex-1 flex-col items-center justify-center gap-0.5',
-              'min-h-[48px] py-1',
-              'press-scale',
+              'relative flex flex-1 flex-col items-center justify-center gap-1',
+              'h-12 rounded-2xl',
+              'press-scale cursor-pointer',
             )}
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
-            {/* Active background — fills entire tab area */}
             {isActive && (
               <motion.div
                 layoutId="bottomNavIndicator"
-                className="absolute inset-0 bg-primary/10"
+                className="absolute inset-0 rounded-2xl bg-primary/[0.12]"
                 transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
               />
             )}
-            
+
             <Icon
               className={cn(
-                'w-5 h-5 transition-colors duration-300 z-10',
+                'w-[18px] h-[18px] transition-colors duration-300 z-10',
                 isActive
                   ? 'text-primary'
                   : 'text-foreground-muted'
@@ -94,4 +92,3 @@ export function BottomNavigation() {
     </nav>
   );
 }
-
