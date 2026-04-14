@@ -16,11 +16,9 @@ export function PrivateRoute({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    // If user authenticated but isn't in the whitelist, redirect to login with error
+    // If user authenticated but isn't in the whitelist, redirect to access-denied page
     if (accessDenied) {
-      const params = new URLSearchParams({ denied: '1' });
-      if (deniedEmail) params.set('email', deniedEmail);
-      setLocation(`/login?${params.toString()}`);
+      setLocation('/access-denied');
       return;
     }
     // NEVER redirect to /login while an OAuth callback is being processed —

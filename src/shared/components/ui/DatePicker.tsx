@@ -159,9 +159,9 @@ export function DatePicker({
       !parsedDate && 'text-foreground-muted/50',
     ],
     (variant === 'badge-overdue' || (variant === 'default' && isOverdue && parsedDate)) &&
-      'text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 px-2 py-1',
+      'text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 px-2 h-[22px] py-0 text-[9px] uppercase tracking-wider',
     (variant === 'badge-upcoming' || (variant === 'default' && parsedDate && !isOverdue)) &&
-      'text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 px-2 py-1',
+      'text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 px-2 h-[22px] py-0 text-[9px] uppercase tracking-wider',
     !parsedDate && variant !== 'compact' && variant !== 'field' &&
       'border border-dashed border-zinc-300 dark:border-zinc-600 text-foreground-muted/60 hover:text-foreground-muted hover:border-primary/40 hover:bg-primary/5',
     !parsedDate && variant === 'compact' &&

@@ -109,11 +109,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Check if this user has a profile in the database (whitelist check)
     try {
-      const { data: existing, error } = await supabase
+      let { data: existing, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
         .maybeSingle();
+
+      // If not found by Auth ID, try to find by Email (usually happens when an admin pre-registers the user)
+      if (!existing && !error && authUser.email) {
+        const { data: existingByEmail, error: emailError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', authUser.email)
+          .maybeSingle();
+        
+        if (existingByEmail) {
+          existing = existingByEmail;
+          // Optionally: We could try to sync the IDs here, but keeping the email mapping is safer
+          // since the random UUID might already be used as an owner_id in projects/tasks.
+        } else if (emailError) {
+          error = emailError;
+        }
+      }
 
       if (error) {
         // RLS or DB error — DON'T block access, use JWT fallback.
