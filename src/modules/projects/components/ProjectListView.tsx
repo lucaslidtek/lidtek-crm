@@ -597,7 +597,7 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
           {sprint.endDate && (
             <span className="flex items-center gap-1 text-[10px] text-emerald-500">
               <Check className="w-3 h-3" />
-              {new Date(sprint.endDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+              {new Date(sprint.endDate.split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
             </span>
           )}
         </div>
@@ -678,9 +678,9 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
       </div>
 
       {/* Line 2: Metadata (Status, Priority, Stage, Dates) */}
-      <div className="flex items-center ml-[32px] flex-wrap">
+      <div className="flex items-center mt-1.5 ml-[32px] flex-wrap gap-3 pr-8">
         {/* Left side: Badges */}
-        <div className="flex items-center gap-2 flex-grow">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Task status — clickable popover */}
           {linkedTaskId && !isCompleted && (
             <div className="relative flex-shrink-0">
@@ -729,8 +729,8 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
           </div>
         </div>
 
-        {/* Right side: Dates */}
-        <div className="flex items-center gap-3 text-[10px] text-foreground-muted flex-shrink-0 ml-auto pr-8">
+        {/* Right side now hugging Left Side: Dates */}
+        <div className="flex items-center gap-2 text-[10px] text-foreground-muted flex-shrink-0">
           {!isCompleted && (
             <DatePicker
               value={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : undefined}

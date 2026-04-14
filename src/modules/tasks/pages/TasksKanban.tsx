@@ -216,7 +216,6 @@ export function TasksKanban() {
         confirmLabel="Excluir"
         cancelLabel="Cancelar"
         variant="danger"
-        loading={deleteLoading}
       />
     </div>
   );

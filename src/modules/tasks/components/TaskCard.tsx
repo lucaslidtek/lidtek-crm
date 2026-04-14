@@ -48,9 +48,15 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
   return (
     <div className={cn(
       'space-y-2 group/task relative',
-      isOverdue && 'border-l-[3px] border-destructive -ml-4 pl-[13px]',
-      isDueSoon && !isOverdue && 'border-l-[3px] border-warning -ml-4 pl-[13px]',
     )}>
+      {/* Absolute edge indicator spanning the container's p-3 bounding box */}
+      {isOverdue && (
+        <div className="absolute -left-3 -top-3 -bottom-3 w-1 bg-destructive rounded-l-lg" />
+      )}
+      {isDueSoon && !isOverdue && (
+        <div className="absolute -left-3 -top-3 -bottom-3 w-1 bg-warning rounded-l-lg" />
+      )}
+      
       {/* Action buttons — always visible on mobile, hover on desktop */}
       {(onEdit || onDelete) && (
         <div className="absolute -top-1 -right-1 flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/task:opacity-100 transition-opacity z-10">

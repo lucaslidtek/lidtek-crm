@@ -527,13 +527,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setTimeout(() => reject(new Error('A requisição para o banco de dados demorou muito tempo (Timeout). A conexão com a internet caiu ou há um bloqueio SQL.')), 10000)
         )
       ]);
+
+      // Sync linked sprint if it exists
+      if (task.sprintId) {
+        const sprintUpdates: Partial<Sprint> = {};
+        if (data.title !== undefined) sprintUpdates.name = data.title;
+        if (data.dueDate !== undefined) sprintUpdates.dueDate = data.dueDate;
+        if (data.priority !== undefined) sprintUpdates.priority = data.priority as any;
+
+        if (Object.keys(sprintUpdates).length > 0) {
+          try {
+            await api.sprints.update(task.sprintId, sprintUpdates);
+            await refreshProjects();
+          } catch (e) {
+            console.warn('[Store] Bidirectional sync to Sprint failed', e);
+          }
+        }
+      }
+
       await refreshTasks();
       return task;
     } catch (err) {
       console.error('[Store] updateTask failed:', err);
       throw err;
     }
-  }, [refreshTasks]);
+  }, [refreshTasks, refreshProjects]);
 
   const moveTaskStatus = useCallback(async (id: string, status: TaskStatus) => {
     try {
@@ -594,17 +612,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateSprint = useCallback(async (sprintId: string, data: Partial<Sprint>) => {
     await api.sprints.update(sprintId, data);
-    // Bidirectional sync: if status changed, sync the linked task
-    if (data.status) {
-      const linkedTask = tasks.find(t => t.sprintId === sprintId);
-      if (linkedTask) {
+    // Bidirectional sync: if metadata changed, sync the linked task
+    const linkedTask = tasks.find(t => t.sprintId === sprintId);
+    if (linkedTask) {
+      const taskUpdates: Partial<Task> = {};
+      
+      if (data.status) {
         const taskStatusMap: Record<string, TaskStatus> = {
           'active': 'in_progress',
           'completed': 'done',
         };
         const newTaskStatus = taskStatusMap[data.status];
         if (newTaskStatus && linkedTask.status !== newTaskStatus) {
-          await api.tasks.updateStatus(linkedTask.id, newTaskStatus);
+          taskUpdates.status = newTaskStatus;
+        }
+      }
+
+      if (data.name !== undefined) taskUpdates.title = data.name;
+      if (data.dueDate !== undefined) taskUpdates.dueDate = data.dueDate;
+      if (data.priority !== undefined) taskUpdates.priority = data.priority as any;
+
+      if (Object.keys(taskUpdates).length > 0) {
+        try {
+           await api.tasks.update(linkedTask.id, taskUpdates);
+        } catch(e) {
+           console.warn('[Store] Bidirectional sync back to Task failed', e);
         }
       }
     }
