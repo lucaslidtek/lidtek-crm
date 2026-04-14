@@ -203,6 +203,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mounted) resolveLoading();
     }, 2000);
 
+    // ── Custom OAuth: handle Google ID token from /api/auth/callback ──
+    // When user returns from our custom Google OAuth flow (via Vercel serverless),
+    // the URL contains a google_id_token that we exchange for a Supabase session.
+    const searchParams = new URLSearchParams(window.location.search);
+    const googleIdToken = searchParams.get('google_id_token');
+    const authError = searchParams.get('auth_error');
+
+    if (googleIdToken) {
+      // Clean URL immediately (remove token from browser bar and history)
+      window.history.replaceState({}, '', window.location.pathname);
+
+      // Exchange Google ID token for a Supabase session
+      supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: googleIdToken,
+      }).then(async ({ data, error }) => {
+        if (!mounted) return;
+        if (!error && data.session?.user) {
+          await loadProfile(data.session.user as Parameters<typeof loadProfile>[0]);
+        } else {
+          console.error('[Auth] signInWithIdToken failed:', error?.message);
+        }
+        resolveLoading();
+      }).catch((err) => {
+        console.error('[Auth] signInWithIdToken error:', err);
+        if (mounted) resolveLoading();
+      });
+
+      // Subscribe to future auth changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mounted) return;
+          if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+            await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+          } else if (event === 'SIGNED_OUT') {
+            setTimeout(() => {
+              if (!mounted) return;
+              supabase.auth.getUser().then(({ data: { user } }) => {
+                if (!user) {
+                  setUser(null);
+                  localStorage.removeItem(AUTH_STORAGE_KEY);
+                }
+              });
+            }, 300);
+          }
+          resolveLoading();
+        }
+      );
+
+      return () => {
+        mounted = false;
+        clearTimeout(safetyTimeout);
+        subscription.unsubscribe();
+      };
+    }
+
+    if (authError) {
+      // Clean error from URL
+      window.history.replaceState({}, '', window.location.pathname);
+      console.error('[Auth] OAuth error:', authError);
+    }
+
     // ── TURBO: Cached user fast-path ──
     // If we have a cached user, isLoading is already false (resolved in useState).
     // We still validate the session in background but the UI renders immediately.
@@ -381,10 +443,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   const login = useCallback(() => {
-    supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    });
+    // Redirect to our own Vercel serverless function instead of Supabase's OAuth.
+    // This makes Google's consent screen show our Vercel domain
+    // instead of the ugly Supabase hash URL.
+    window.location.href = '/api/auth/google';
   }, []);
 
   const loginWithPassword = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {

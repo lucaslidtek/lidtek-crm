@@ -21,7 +21,6 @@ export function Login() {
 
   const handleLogin = () => {
     setLoginPending(true);
-    setAccessDeniedMsg(null);
     login();
   };
 
@@ -29,7 +28,6 @@ export function Login() {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
     setEmailError(null);
-    setAccessDeniedMsg(null);
     setEmailLoading(true);
     const { error } = await loginWithPassword(email.trim(), password);
     if (error) {
