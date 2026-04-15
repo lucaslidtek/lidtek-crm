@@ -117,15 +117,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // If not found by Auth ID, try to find by Email (usually happens when an admin pre-registers the user)
       if (!existing && !error && authUser.email) {
-        const { data: existingByEmail, error: emailError } = await supabase
+        // Use ilike and trim to prevent trailing spaces or case differences from breaking the login
+        const safeEmail = authUser.email.trim();
+        const { data: existingByEmails, error: emailError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('email', authUser.email)
-          .maybeSingle();
+          .ilike('email', `%${safeEmail}%`)
+          .limit(1);
         
-        if (existingByEmail) {
-          existing = existingByEmail;
-          // Optionally: We could try to sync the IDs here, but keeping the email mapping is safer
+        if (existingByEmails && existingByEmails.length > 0) {
+          existing = existingByEmails[0];
+          // We could try to sync the IDs here, but keeping the email mapping is safer
           // since the random UUID might already be used as an owner_id in projects/tasks.
         } else if (emailError) {
           error = emailError;

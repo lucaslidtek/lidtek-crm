@@ -10,6 +10,7 @@ import { Briefcase, ChevronDown, Plus, Check, Clock, CalendarDays, Trash2, Arrow
 import { cn } from '@/shared/utils/cn';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DatePicker } from '@/shared/components/ui/DatePicker';
+import confetti from 'canvas-confetti';
 
 interface ProjectListViewProps {
   projects: Project[];
@@ -25,10 +26,20 @@ const PRIORITY_CONFIG: Record<SprintPriority, { label: string; color: string; ic
 export function ProjectListView({ projects, onProjectClick }: ProjectListViewProps) {
   const { getUserById, createSprint, completeSprint, updateSprint, deleteSprint, tasks, moveTaskStatus } = useStore();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedCompletedIds, setExpandedCompletedIds] = useState<Set<string>>(new Set());
   const isMobile = useIsMobile();
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCompleted = (id: string) => {
+    setExpandedCompletedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -237,14 +248,14 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
                     'border-t border-border-subtle py-3 bg-black/3 dark:bg-white/[0.02]',
                     isMobile ? 'px-3' : 'px-5',
                   )}>
-                    <div className="space-y-1">
-                      {/* Sort: active first, then completed newest first */}
+                    {/* Add Sprint - Moved to top so it's always first */}
+                    <AddSprintRow projectId={project.id} onAdd={createSprint} isMobile={isMobile} />
+
+                    <div className="space-y-1 mt-3">
+                      {/* Active Sprints */}
                       {[...project.sprints]
-                        .sort((a, b) => {
-                          if (a.status === 'active' && b.status !== 'active') return -1;
-                          if (a.status !== 'active' && b.status === 'active') return 1;
-                          return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
-                        })
+                        .filter(s => s.status !== 'completed')
+                        .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
                         .map((sprint) => (
                           <SprintRow
                             key={sprint.id}
@@ -260,10 +271,55 @@ export function ProjectListView({ projects, onProjectClick }: ProjectListViewPro
                           />
                         ))
                       }
-                    </div>
 
-                    {/* Add Sprint */}
-                    <AddSprintRow projectId={project.id} onAdd={createSprint} isMobile={isMobile} />
+                      {/* Completed Sprints Section */}
+                      {(() => {
+                        const completed = project.sprints.filter(s => s.status === 'completed')
+                          .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+                        
+                        if (completed.length === 0) return null;
+                        
+                        const showCompleted = expandedCompletedIds.has(project.id);
+                        
+                        return (
+                          <div className="pt-2 mt-2 border-t border-dashed border-border-subtle">
+                            <button
+                              onClick={() => toggleCompleted(project.id)}
+                              className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-foreground-muted hover:text-foreground transition-colors rounded-md hover:bg-black/5 dark:hover:bg-white/5"
+                            >
+                              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showCompleted ? "rotate-180" : "")} />
+                              {showCompleted ? 'Ocultar' : 'Mostrar'} {completed.length} sprint{completed.length !== 1 ? 's' : ''} concluída{completed.length !== 1 ? 's' : ''}
+                            </button>
+                            
+                            <AnimatePresence>
+                              {showCompleted && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  className="space-y-1 mt-2 overflow-hidden"
+                                >
+                                  {completed.map((sprint) => (
+                                    <SprintRow
+                                      key={sprint.id}
+                                      sprint={sprint}
+                                      isActive={sprint.id === project.currentSprintId}
+                                      onComplete={() => completeSprint(sprint.id)}
+                                      onUpdate={(updates) => updateSprint(sprint.id, updates)}
+                                      onDelete={() => deleteSprint(sprint.id)}
+                                      isMobile={isMobile}
+                                      linkedTaskStatus={tasks.find(t => t.sprintId === sprint.id)?.status}
+                                      linkedTaskId={tasks.find(t => t.sprintId === sprint.id)?.id}
+                                      onTaskStatusChange={(taskId, status) => moveTaskStatus(taskId, status)}
+                                    />
+                                  ))}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -810,10 +866,22 @@ function AddSprintRow({ projectId, onAdd, isMobile }: {
         dueDate: dueDate || undefined,
         status: 'active',
       });
+      
+      // Animação de confete conforme solicitado!
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#5A4FFF', '#10B981', '#F59E0B']
+      });
+
       setName('');
       setPriority('medium');
       setDueDate('');
       setIsAdding(false);
+    } catch (err: any) {
+      console.error('AddSprintRow save failed:', err);
+      alert('Erro ao criar sprint: ' + (err.message || String(err)));
     } finally {
       setSaving(false);
     }

@@ -604,21 +604,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshTasks]);
 
   const createSprint = useCallback(async (projectId: string, data: Parameters<typeof api.sprints.create>[1]) => {
-    const sprint = await api.sprints.create(projectId, data);
+    // 10s Timeout protection (same as updateTask) to prevent UI hanging infinitely on SQL locks
+    const sprint = await Promise.race([
+      api.sprints.create(projectId, data),
+      new Promise<Sprint>((_, reject) => 
+        setTimeout(() => reject(new Error('A requisição para o banco de dados demorou muito tempo (Timeout). A conexão com a internet caiu ou ocorreu um bloqueio temporário no banco.')), 10000)
+      )
+    ]);
 
     // Auto-create a task linked to this sprint so it appears on the Tasks board
     const project = projects.find(p => p.id === projectId);
-    await api.tasks.create({
-      title: data.name,
-      type: 'project',
-      status: 'todo',
-      priority: data.priority ?? 'medium',
-      ownerIds: project?.ownerIds?.length ? project.ownerIds : [users[0]?.id || ''],
-      tags: [],
-      projectId,
-      sprintId: sprint.id,
-      dueDate: data.dueDate,
-    });
+    
+    try {
+      await api.tasks.create({
+        title: data.name,
+        type: 'project',
+        status: 'todo',
+        priority: data.priority ?? 'medium',
+        ownerIds: project?.ownerIds?.length ? project.ownerIds : (users.length > 0 && users[0]?.id ? [users[0].id] : []),
+        tags: [],
+        projectId,
+        sprintId: sprint.id,
+        dueDate: data.dueDate,
+      });
+    } catch (e) {
+      console.warn('[Store] Failed to auto-create linked task for sprint (might be missing users/ownerIds)', e);
+    }
 
     await Promise.all([refreshProjects(), refreshTasks()]);
   }, [refreshProjects, refreshTasks, projects, users]);

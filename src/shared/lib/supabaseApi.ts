@@ -569,6 +569,7 @@ export const api = {
   // --- Sprints ---
   sprints: {
     create: async (projectId: string, input: Omit<Sprint, 'id' | 'projectId' | 'taskIds'>): Promise<Sprint> => {
+      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('sprints')
         .insert({

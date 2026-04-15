@@ -309,7 +309,7 @@ export function Dashboard() {
                             isOverdue ? 'text-destructive' : 'text-foreground-muted',
                           )}>
                             <Calendar className="w-3 h-3" />
-                            {new Date(task.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            {new Date(task.dueDate.split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                           </span>
                         )}
                       </div>
@@ -367,7 +367,7 @@ export function Dashboard() {
                           {project.clientName}
                         </p>
                         <p className="text-[10px] text-foreground-muted">
-                          {ownerLabel} · {new Date(project.nextDeliveryDate!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          {ownerLabel} · {new Date(project.nextDeliveryDate!.split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                         </p>
                       </div>
                       <Badge variant={project.type === 'recurring' ? 'recurring' : 'oneshot'}>
