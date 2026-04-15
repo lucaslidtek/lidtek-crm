@@ -12,6 +12,8 @@ import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
 import { PROJECT_STAGES } from '@/shared/lib/constants';
 import type { Project, ProjectType, ProjectStatus } from '@/shared/types/models';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/components/ui/DropdownMenu';
+import { ChevronDown, Check } from 'lucide-react';
 
 type FilterType = 'all' | ProjectType;
 type StatusFilter = 'all' | ProjectStatus;
@@ -135,41 +137,77 @@ export function ProjectsPage() {
           searchPlaceholder={`Buscar entre ${filteredProjects.length} projeto${filteredProjects.length !== 1 ? 's' : ''}...`}
           actions={
             <>
-              {/* Type filter chips */}
-              <div className="flex items-center gap-1 p-1 glass-subtle rounded-lg">
-                {FILTER_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setFilterType(option.id)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer',
-                      filterType === option.id
-                        ? 'bg-primary/15 text-primary'
-                        : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+              {isMobile ? (
+                <>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="px-3 py-2 rounded-lg text-xs font-medium bg-black/5 dark:bg-white/5 text-foreground-muted hover:bg-black/10 transition-colors flex items-center gap-1.5 outline-none">
+                      {filterType === 'all' ? 'Tipos (Todos)' : FILTER_OPTIONS.find(o => o.id === filterType)?.label}
+                      <ChevronDown className="w-3.5 h-3.5 opacity-50" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {FILTER_OPTIONS.map((opt) => (
+                        <DropdownMenuItem key={opt.id} onClick={() => setFilterType(opt.id)} className="justify-between min-w-[140px]">
+                          {opt.label}
+                          {filterType === opt.id && <Check className="w-4 h-4 text-primary" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-              {/* Status filter chips */}
-              <div className="flex items-center gap-1 p-1 glass-subtle rounded-lg">
-                {STATUS_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setStatusFilter(option.id)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer press-scale whitespace-nowrap',
-                      statusFilter === option.id
-                        ? 'bg-primary/15 text-primary'
-                        : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="px-3 py-2 rounded-lg text-xs font-medium bg-black/5 dark:bg-white/5 text-foreground-muted hover:bg-black/10 transition-colors flex items-center gap-1.5 outline-none">
+                      {statusFilter === 'all' ? 'Status (Todos)' : STATUS_OPTIONS.find(o => o.id === statusFilter)?.label}
+                      <ChevronDown className="w-3.5 h-3.5 opacity-50" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {STATUS_OPTIONS.map((opt) => (
+                        <DropdownMenuItem key={opt.id} onClick={() => setStatusFilter(opt.id)} className="justify-between min-w-[140px]">
+                          {opt.label}
+                          {statusFilter === opt.id && <Check className="w-4 h-4 text-primary" />}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              ) : (
+                <>
+                  {/* Type filter chips */}
+                  <div className="flex items-center gap-1 p-1 glass-subtle rounded-lg">
+                    {FILTER_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        onClick={() => setFilterType(option.id)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer',
+                          filterType === option.id
+                            ? 'bg-primary/15 text-primary'
+                            : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Status filter chips */}
+                  <div className="flex items-center gap-1 p-1 glass-subtle rounded-lg">
+                    {STATUS_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        onClick={() => setStatusFilter(option.id)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 cursor-pointer press-scale whitespace-nowrap',
+                          statusFilter === option.id
+                            ? 'bg-primary/15 text-primary'
+                            : 'text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5',
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
 
               {!isMobile && <ViewToggle view={view} onChange={setView} />}
             </>

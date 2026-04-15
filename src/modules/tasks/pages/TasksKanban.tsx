@@ -59,11 +59,15 @@ export function TasksKanban() {
     ).length;
   }, [tasks, search]);
 
+  const pendingTasks = useMemo(() => {
+    return allFilteredTasks.filter(t => t.status !== 'done');
+  }, [allFilteredTasks]);
+
   // Mobile: filtered tasks by selected status
   const mobileFilteredTasks = useMemo(() => {
-    if (mobileStatus === 'all') return allFilteredTasks;
+    if (mobileStatus === 'all') return pendingTasks;
     return filteredTasksByStatus[mobileStatus] ?? [];
-  }, [mobileStatus, allFilteredTasks, filteredTasksByStatus]);
+  }, [mobileStatus, pendingTasks, filteredTasksByStatus]);
 
   const n = filteredCount;
 
@@ -120,8 +124,8 @@ export function TasksKanban() {
                   : 'bg-zinc-100 dark:bg-zinc-800 text-foreground-muted',
               )}
             >
-              Todas
-              <span className="text-[10px] opacity-70">{allFilteredTasks.length}</span>
+              Pendentes
+              <span className="text-[10px] opacity-70">{pendingTasks.length}</span>
             </button>
             {TASK_STATUSES.map((status) => {
               const count = filteredTasksByStatus[status.id]?.length ?? 0;
