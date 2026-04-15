@@ -4,6 +4,7 @@ import { api } from '@/shared/lib/supabaseApi';
 import { supabase } from '@/shared/lib/supabase';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { DEFAULT_FUNNEL_COLUMNS } from '@/shared/lib/constants';
+import confetti from 'canvas-confetti';
 
 // ============================================
 // STORE — Estado global do app
@@ -592,6 +593,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             'blocked': 'active',
           };
           const newSprintStatus = sprintStatusMap[status];
+
+          // Optimistic Sprint update
+          setProjects(prevProjects => prevProjects.map(proj => ({
+            ...proj,
+            sprints: proj.sprints.map(sprint => 
+              sprint.id === linkedTask.sprintId 
+                ? { ...sprint, status: newSprintStatus as any } 
+                : sprint
+            )
+          })));
+
           if (newSprintStatus === 'completed') {
             await api.sprints.complete(linkedTask.sprintId);
           } else {
@@ -602,6 +614,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       }
       
+      if (status === 'done') {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#5A4FFF', '#10B981', '#F59E0B']
+        });
+      }
+      
+
       // 4. Refresh actual state
       await Promise.all([refreshTasks(), refreshProjects()]);
       return task;
@@ -688,6 +710,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshProjects, refreshTasks, tasks]);
 
   const completeSprint = useCallback(async (sprintId: string) => {
+    // Optimistic updates
+    setProjects(prev => prev.map(p => ({
+      ...p,
+      sprints: p.sprints.map(s => s.id === sprintId ? { ...s, status: 'completed' } : s)
+    })));
+    setTasks(prev => prev.map(t => t.sprintId === sprintId ? { ...t, status: 'done' } : t));
+
     await api.sprints.complete(sprintId);
     // Also mark the linked task as done
     const linkedTask = tasks.find(t => t.sprintId === sprintId);
