@@ -6,9 +6,13 @@
 
 ## Estado Atual do Projeto
 
-**Última atualização:** 2026-04-14 08:36 (BRT)
-**Sprint ativo:** S-PERF-02 (Hotfix: Black Screen)
-**Status geral:** ✅ Concluído
+**Última atualização:** 2026-04-15 17:28 (BRT)
+**Sprint ativo:** T-AD-01 (Limpeza de Débito Técnico)
+**Status geral:** ✅ PASSOU
+
+### Saúde do Projeto
+- **Status do Build:** ✅ PASSOU (`tsc --noEmit` limpo)
+- **Harness Sensors:** 🟢 `harness:check` validado e passando por padrão.
 
 ---
 

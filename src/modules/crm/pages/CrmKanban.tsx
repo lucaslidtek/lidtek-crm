@@ -14,7 +14,7 @@ import { ViewToggle, type ViewType } from '@/shared/components/ui/ViewToggle';
 import { LeadListView } from '@/modules/crm/components/LeadListView';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { cn } from '@/shared/utils/cn';
-import type { Lead, FunnelColumn } from '@/shared/types/models';
+import type { Lead, FunnelColumn, ColumnBehavior } from '@/shared/types/models';
 
 export function CrmKanban() {
   const { leads, leadsByStage, moveLead } = useLeads();
@@ -59,7 +59,7 @@ export function CrmKanban() {
     }
   }, [funnelColumns]);
 
-  const handleColumnSave = useCallback(async (data: { label: string; color: string; behavior: string }) => {
+  const handleColumnSave = useCallback(async (data: { label: string; color: string; behavior: ColumnBehavior }) => {
     if (editingColumn) {
       await updateFunnelColumn(editingColumn.id, data);
     } else {
@@ -81,9 +81,6 @@ export function CrmKanban() {
     isDefault: col.isDefault,
   }));
 
-  const leadsInEditingColumn = editingColumn
-    ? (leadsByStage[editingColumn.id]?.length ?? 0)
-    : 0;
 
   // Search filtering
   const filteredLeads = useMemo(() => {
@@ -249,7 +246,6 @@ export function CrmKanban() {
           column={editingColumn}
           onSave={handleColumnSave}
           onDelete={editingColumn && !editingColumn.isDefault ? handleColumnDelete : undefined}
-          leadsInColumn={leadsInEditingColumn}
         />
       )}
     </div>

@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "harness:check": "tsc --noEmit"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.0",

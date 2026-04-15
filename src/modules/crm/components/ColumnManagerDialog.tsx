@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Palette, Check, Trash2, AlertTriangle, Zap, Trophy, XCircle } from 'lucide-react';
+import { X, Palette, Check, Trash2, Zap, Trophy, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
-import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { cn } from '@/shared/utils/cn';
 import type { FunnelColumn, ColumnBehavior } from '@/shared/types/models';
 
@@ -14,7 +13,6 @@ interface ColumnManagerDialogProps {
   column?: FunnelColumn | null;
   onSave: (data: { label: string; color: string; behavior: ColumnBehavior }) => Promise<void>;
   onDelete?: () => Promise<void>;
-  leadsInColumn?: number;
 }
 
 const COLOR_PRESETS = [
@@ -34,13 +32,11 @@ export function ColumnManagerDialog({
   column,
   onSave,
   onDelete,
-  leadsInColumn = 0,
 }: ColumnManagerDialogProps) {
   const [label, setLabel] = useState('');
   const [color, setColor] = useState('#5A4FFF');
   const [behavior, setBehavior] = useState<ColumnBehavior>('active');
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,23 +66,6 @@ export function ColumnManagerDialog({
       setError(err instanceof Error ? err.message : 'Erro ao salvar');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
-    setDeleting(true);
-    try {
-      await onDelete?.();
-      onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao excluir');
-    } finally {
-      setDeleting(false);
-      setConfirmDelete(false);
     }
   };
 

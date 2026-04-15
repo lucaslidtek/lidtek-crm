@@ -9,7 +9,6 @@ import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { useStore } from '@/shared/lib/store';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
-import { useAuth } from '@/app/providers/AuthProvider';
 import { Button } from '@/shared/components/ui/Button';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { cn } from '@/shared/utils/cn';
@@ -23,9 +22,7 @@ export function TasksKanban() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const { tasks, reorderTasks, deleteTask } = useStore();
-  const { user } = useAuth();
   const isMobile = useIsMobile();
 
   const [ownerFilter, setOwnerFilter] = useState<string | 'all'>('all');
@@ -72,14 +69,13 @@ export function TasksKanban() {
 
   const handleConfirmDelete = async () => {
     if (!deletingTask) return;
-    setDeleteLoading(true);
     try {
       await deleteTask(deletingTask.id);
       setDeletingTask(null);
     } catch (err) {
       console.error('[TasksKanban] deleteTask failed:', err);
     } finally {
-      setDeleteLoading(false);
+      // Done
     }
   };
 

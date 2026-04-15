@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useLocation } from 'wouter';
 import { useEffect, useState, useMemo } from 'react';

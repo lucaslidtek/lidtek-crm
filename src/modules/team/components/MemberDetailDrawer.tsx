@@ -16,7 +16,6 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
-import { Button } from '@/shared/components/ui/Button';
 import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import { MobileDrawerWrapper } from '@/shared/components/layout/MobileDrawerWrapper';
 import { useStore } from '@/shared/lib/store';

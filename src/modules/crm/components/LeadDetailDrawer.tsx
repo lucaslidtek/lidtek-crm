@@ -1,4 +1,4 @@
-import { X, Calendar, Mail, Phone, FileText, MessageSquare, Briefcase, ArrowRight, Tag, User, Edit3, Check, Globe, Plus, Trash2, Image as ImageIcon, ChevronDown, AlertTriangle, ChevronRight, ListTodo } from 'lucide-react';
+import { X, Calendar, Mail, Phone, FileText, MessageSquare, Briefcase, ArrowRight, Tag, User, Edit3, Check, Globe, Plus, Trash2, Image as ImageIcon, ChevronDown, ChevronRight, ListTodo } from 'lucide-react';
 import { WhatsAppIcon } from '@/shared/components/icons/WhatsAppIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/utils/cn';

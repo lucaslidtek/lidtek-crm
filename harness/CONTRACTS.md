@@ -13,6 +13,19 @@
 
 ---
 
+### Tarefas Ad-Hoc
+
+#### T-AD-01: Limpeza de Débito Técnico (TSC)
+**Tipo:** Ad-hoc — solicitada em 2026-04-15 17:22
+**Descrição:** Corrigir 6 erros de TypeScript pré-existentes identificados pelo sensor harness:check.
+**Critérios de aceite:**
+- [x] npm run harness:check retorna exit code 0
+- [x] Nenhum erro de tipo remanescente nos arquivos afetados
+**Sensores rodados:** [x] type-check [ ] lint [ ] testes [ ] build
+**Status:** ✅ Concluído
+
+---
+
 ### Tarefas do Sprint
 
 #### T-01: Splash Screen inline no index.html
