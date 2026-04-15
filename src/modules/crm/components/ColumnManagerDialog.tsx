@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
-import { X, Palette, Check, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Palette, Check, Trash2, AlertTriangle, Zap, Trophy, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { cn } from '@/shared/utils/cn';
-import type { FunnelColumn } from '@/shared/types/models';
+import type { FunnelColumn, ColumnBehavior } from '@/shared/types/models';
 
 interface ColumnManagerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   column?: FunnelColumn | null;
-  onSave: (data: { label: string; color: string }) => Promise<void>;
+  onSave: (data: { label: string; color: string; behavior: ColumnBehavior }) => Promise<void>;
   onDelete?: () => Promise<void>;
   leadsInColumn?: number;
 }
@@ -37,6 +38,7 @@ export function ColumnManagerDialog({
 }: ColumnManagerDialogProps) {
   const [label, setLabel] = useState('');
   const [color, setColor] = useState('#5A4FFF');
+  const [behavior, setBehavior] = useState<ColumnBehavior>('active');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -48,6 +50,7 @@ export function ColumnManagerDialog({
     if (open) {
       setLabel(column?.label ?? '');
       setColor(column?.color ?? '#5A4FFF');
+      setBehavior(column?.behavior ?? 'active');
       setError(null);
       setConfirmDelete(false);
     }
@@ -61,7 +64,7 @@ export function ColumnManagerDialog({
     setSaving(true);
     setError(null);
     try {
-      await onSave({ label: label.trim(), color });
+      await onSave({ label: label.trim(), color, behavior });
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar');
@@ -110,7 +113,7 @@ export function ColumnManagerDialog({
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white dark:bg-zinc-900 w-full max-w-[420px] rounded-xl overflow-hidden pointer-events-auto shadow-2xl border border-zinc-200 dark:border-zinc-800"
+              className="bg-white dark:bg-zinc-900 w-full max-w-[420px] max-h-[90vh] rounded-xl overflow-hidden pointer-events-auto shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col"
               initial={{ y: 20, scale: 0.96 }}
               animate={{ y: 0, scale: 1 }}
               exit={{ y: 20, scale: 0.96 }}
@@ -131,7 +134,7 @@ export function ColumnManagerDialog({
               </div>
 
               {/* Content */}
-              <div className="px-5 space-y-5 pb-5">
+              <div className="px-5 space-y-5 pb-5 overflow-y-auto">
                 {/* Preview */}
                 <div className="flex items-center gap-2.5 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
                   <span
@@ -203,6 +206,78 @@ export function ColumnManagerDialog({
                   </div>
                 </div>
 
+                {/* Behavior Selector */}
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2 flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5" />
+                    Comportamento
+                  </label>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mb-2.5">
+                    O que acontece quando um lead é movido para esta coluna?
+                  </p>
+                  <div className="space-y-1.5">
+                    {([
+                      {
+                        value: 'active' as ColumnBehavior,
+                        icon: <Zap className="w-3.5 h-3.5" />,
+                        label: 'Pipeline ativo',
+                        desc: 'Lead permanece ativo. Projeto segue visível normalmente.',
+                        accent: 'text-blue-500',
+                        bg: 'bg-blue-500/10',
+                      },
+                      {
+                        value: 'won' as ColumnBehavior,
+                        icon: <Trophy className="w-3.5 h-3.5" />,
+                        label: 'Negócio ganho',
+                        desc: 'Lead é dado como ganho. Permite conversão para projeto.',
+                        accent: 'text-emerald-500',
+                        bg: 'bg-emerald-500/10',
+                      },
+                      {
+                        value: 'lost' as ColumnBehavior,
+                        icon: <XCircle className="w-3.5 h-3.5" />,
+                        label: 'Perdido / Cancelado',
+                        desc: 'Lead é inativado. Projeto associado será arquivado automaticamente.',
+                        accent: 'text-red-500',
+                        bg: 'bg-red-500/10',
+                      },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setBehavior(opt.value)}
+                        className={cn(
+                          'w-full flex items-start gap-3 p-3 rounded-lg border transition-all text-left cursor-pointer',
+                          behavior === opt.value
+                            ? `border-current ${opt.accent} ${opt.bg}`
+                            : 'border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700',
+                        )}
+                      >
+                        <div className={cn(
+                          'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',
+                          behavior === opt.value ? opt.bg : 'bg-zinc-100 dark:bg-zinc-800',
+                        )}>
+                          <span className={behavior === opt.value ? opt.accent : 'text-zinc-400'}>{opt.icon}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              'text-xs font-semibold',
+                              behavior === opt.value ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-600 dark:text-zinc-400',
+                            )}>
+                              {opt.label}
+                            </span>
+                            {behavior === opt.value && (
+                              <Check className="w-3 h-3 text-current" />
+                            )}
+                          </div>
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 leading-relaxed">{opt.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Error */}
                 {error && (
                   <p className="text-xs text-red-500 bg-red-50 dark:bg-red-950/30 px-3 py-2 rounded-lg">{error}</p>
@@ -216,46 +291,13 @@ export function ColumnManagerDialog({
                       ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
                       : 'border-zinc-100 dark:border-zinc-800',
                   )}>
-                    {confirmDelete ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span className="text-xs font-semibold">Confirmar exclusão?</span>
-                        </div>
-                        {leadsInColumn > 0 && (
-                          <p className="text-[11px] text-red-600/80 dark:text-red-400/80">
-                            {leadsInColumn} lead{leadsInColumn > 1 ? 's' : ''} será{leadsInColumn > 1 ? 'ão' : ''} movido{leadsInColumn > 1 ? 's' : ''} para a primeira coluna.
-                          </p>
-                        )}
-                        <div className="flex gap-2 mt-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setConfirmDelete(false)}
-                            className="flex-1"
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={handleDelete}
-                            disabled={deleting}
-                            className="flex-1"
-                          >
-                            {deleting ? 'Excluindo...' : 'Excluir'}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handleDelete}
-                        className="flex items-center gap-2 text-xs text-zinc-400 hover:text-red-500 transition-colors cursor-pointer w-full"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Excluir esta coluna
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setConfirmDelete(true)}
+                      className="flex items-center gap-2 text-xs text-zinc-400 hover:text-red-500 transition-colors cursor-pointer w-full"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Excluir esta coluna
+                    </button>
                   </div>
                 )}
               </div>

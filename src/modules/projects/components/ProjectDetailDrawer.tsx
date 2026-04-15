@@ -11,6 +11,7 @@ import { usePermissions } from '@/shared/hooks/usePermissions';
 import { PROJECT_STAGES, getStageLabel, getStageColor } from '@/shared/lib/constants';
 import type { Project } from '@/shared/types/models';
 import { useLocation } from 'wouter';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 
 interface ProjectDetailDrawerProps {
   project: Project | null;
@@ -449,6 +450,7 @@ function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename,
   const isCompleted = sprint.status === 'completed';
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(sprint.name);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setDraft(sprint.name); }, [sprint.name]);
@@ -532,7 +534,7 @@ function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename,
               </button>
             )}
             <button
-              onClick={onDelete}
+              onClick={() => setShowConfirmDelete(true)}
               className="w-4 h-4 rounded flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors cursor-pointer"
               title="Excluir"
             >
@@ -553,6 +555,14 @@ function TimelineSprintRow({ sprint, isActive, stageColor, stageLabel, onRename,
           </span>
         )}
       </div>
+      
+      <ConfirmDialog
+        open={showConfirmDelete}
+        onOpenChange={setShowConfirmDelete}
+        onConfirm={onDelete}
+        title="Excluir Sprint"
+        description="Tem certeza que deseja excluir esta sprint da visão detalhada do projeto? As tarefas associadas podem ficar sem sprint."
+      />
     </div>
   );
 }

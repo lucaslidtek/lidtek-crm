@@ -59,7 +59,7 @@ export function CrmKanban() {
     }
   }, [funnelColumns]);
 
-  const handleColumnSave = useCallback(async (data: { label: string; color: string }) => {
+  const handleColumnSave = useCallback(async (data: { label: string; color: string; behavior: string }) => {
     if (editingColumn) {
       await updateFunnelColumn(editingColumn.id, data);
     } else {

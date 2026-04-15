@@ -20,6 +20,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import { MobileDrawerWrapper } from '@/shared/components/layout/MobileDrawerWrapper';
 import { useStore } from '@/shared/lib/store';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import type { User, UserRole } from '@/shared/types/models';
 
 interface MemberDetailDrawerProps {
@@ -355,34 +356,28 @@ export function MemberDetailDrawer({ member, onClose }: MemberDetailDrawerProps)
 
               {/* Danger zone */}
               <div className="pt-2">
-                {!confirmDelete ? (
-                  <button
-                    onClick={() => setConfirmDelete(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium text-red-500/70 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Remover Membro
-                  </button>
-                ) : (
-                  <div className="space-y-2 rounded-lg bg-red-50/50 dark:bg-red-950/20 border border-red-200/50 dark:border-red-900/30 p-3">
-                    <p className="text-xs text-red-500 text-center">
-                      Confirma a remoção de <strong>{member.name}</strong>?
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" className="flex-1 !text-xs !py-1.5" onClick={() => setConfirmDelete(false)}>
-                        Cancelar
-                      </Button>
-                      <Button variant="destructive" className="flex-1 !text-xs !py-1.5" onClick={handleDelete}>
-                        Confirmar
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium text-red-500/70 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remover Membro
+                </button>
               </div>
 
 
             </div>
         </div>
+      )}
+      
+      {member && (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          onConfirm={handleDelete}
+          title="Remover Membro"
+          description={`Tem certeza que deseja remover ${member.name} da equipe?`}
+        />
       )}
     </MobileDrawerWrapper>
   );

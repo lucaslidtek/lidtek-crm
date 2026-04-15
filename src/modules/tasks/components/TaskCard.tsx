@@ -2,6 +2,8 @@ import { Briefcase, Calendar, Pencil, Trash2, User } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { PriorityBadge, TaskTypeBadge, Badge } from '@/shared/components/ui/Badge';
 import { StatusChip } from '@/modules/tasks/components/StatusChip';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
+import { useState } from 'react';
 import { useStore } from '@/shared/lib/store';
 import type { Task, TaskStatus } from '@/shared/types/models';
 
@@ -14,6 +16,7 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: TaskCardProps) {
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const { getUserById, leads, projects, moveTaskStatus } = useStore();
   const owners = (task.ownerIds ?? []).map(id => getUserById(id)).filter(Boolean);
 
@@ -71,7 +74,7 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
           )}
           {onDelete && (
             <button
-              onClick={(e) => { e.stopPropagation(); onDelete(task); }}
+              onClick={(e) => { e.stopPropagation(); setShowConfirmDelete(true); }}
               className="w-7 h-7 sm:w-6 sm:h-6 rounded-md flex items-center justify-center bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-red-500 hover:border-red-300 dark:hover:border-red-800 transition-all cursor-pointer shadow-sm press-scale"
               title="Excluir tarefa"
             >
@@ -160,6 +163,16 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
           </div>
         )}
       </div>
+      
+      {onDelete && (
+        <ConfirmDialog
+          open={showConfirmDelete}
+          onOpenChange={setShowConfirmDelete}
+          onConfirm={() => onDelete(task)}
+          title="Excluir Tarefa"
+          description="Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita."
+        />
+      )}
     </div>
   );
 }

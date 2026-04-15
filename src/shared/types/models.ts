@@ -7,12 +7,15 @@
 
 export type FunnelStage = string;
 
+export type ColumnBehavior = 'active' | 'won' | 'lost';
+
 export interface FunnelColumn {
   id: string;
   label: string;
   color: string;
   position: number;
   isDefault: boolean;
+  behavior: ColumnBehavior;
 }
 
 export type ProjectType = 'recurring' | 'oneshot';

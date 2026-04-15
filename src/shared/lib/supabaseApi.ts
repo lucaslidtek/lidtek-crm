@@ -755,10 +755,11 @@ export const api = {
         color: row.color,
         position: row.position,
         isDefault: row.is_default ?? false,
+        behavior: row.behavior ?? 'active',
       }));
     },
 
-    create: async (input: { label: string; color: string }): Promise<FunnelColumn> => {
+    create: async (input: { label: string; color: string; behavior?: string }): Promise<FunnelColumn> => {
       // Get max position to append at end
       const { data: maxRow } = await supabase
         .from('funnel_columns')
@@ -775,6 +776,7 @@ export const api = {
           color: input.color,
           position: nextPosition,
           is_default: false,
+          behavior: input.behavior ?? 'active',
         })
         .select()
         .single();
@@ -785,13 +787,15 @@ export const api = {
         color: data.color,
         position: data.position,
         isDefault: false,
+        behavior: data.behavior ?? 'active',
       };
     },
 
-    update: async (id: string, updates: Partial<Pick<FunnelColumn, 'label' | 'color'>>): Promise<FunnelColumn> => {
+    update: async (id: string, updates: Partial<Pick<FunnelColumn, 'label' | 'color' | 'behavior'>>): Promise<FunnelColumn> => {
       const payload: Record<string, any> = {};
       if (updates.label !== undefined) payload.label = updates.label;
       if (updates.color !== undefined) payload.color = updates.color;
+      if (updates.behavior !== undefined) payload.behavior = updates.behavior;
 
       const { data, error } = await supabase
         .from('funnel_columns')
@@ -806,6 +810,7 @@ export const api = {
         color: data.color,
         position: data.position,
         isDefault: data.is_default ?? false,
+        behavior: data.behavior ?? 'active',
       };
     },
 

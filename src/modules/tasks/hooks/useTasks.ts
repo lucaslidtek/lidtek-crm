@@ -6,6 +6,7 @@ import { TASK_STATUSES } from '@/shared/lib/constants';
 interface TaskFiltersState {
   type: TaskType | 'all';
   priority: TaskPriority | 'all';
+  ownerId?: string | 'all';
 }
 
 export function useTasks(filters?: TaskFiltersState) {
@@ -19,8 +20,11 @@ export function useTasks(filters?: TaskFiltersState) {
     if (filters?.priority && filters.priority !== 'all') {
       result = result.filter(t => t.priority === filters.priority);
     }
+    if (filters?.ownerId && filters.ownerId !== 'all') {
+      result = result.filter(t => t.ownerIds?.includes(filters.ownerId as string));
+    }
     return result;
-  }, [tasks, filters?.type, filters?.priority]);
+  }, [tasks, filters?.type, filters?.priority, filters?.ownerId]);
 
   const tasksByStatus = useMemo(() => {
     const grouped: Record<string, Task[]> = {};

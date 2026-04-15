@@ -3,6 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { cn } from '@/shared/utils/cn';
 import { KanbanCard } from './KanbanCard';
 import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
@@ -34,6 +35,7 @@ export function KanbanColumn<T extends { id: string }>({
   const { isOver, setNodeRef } = useDroppable({ id });
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu on outside click
@@ -130,7 +132,7 @@ export function KanbanColumn<T extends { id: string }>({
                   )}
                   {onDelete && !isDefault && (
                     <button
-                      onClick={() => { setMenuOpen(false); onDelete(); }}
+                      onClick={() => { setMenuOpen(false); setShowConfirmDelete(true); }}
                       className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -169,6 +171,16 @@ export function KanbanColumn<T extends { id: string }>({
           </div>
         </SortableContext>
       </div>
+      
+      {onDelete && (
+        <ConfirmDialog
+          open={showConfirmDelete}
+          onOpenChange={setShowConfirmDelete}
+          onConfirm={onDelete}
+          title="Excluir Coluna"
+          description="Tem certeza que deseja excluir esta coluna? Tarefas dentro dela poderão perder sua etapa."
+        />
+      )}
     </div>
   );
 }

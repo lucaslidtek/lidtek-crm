@@ -48,8 +48,8 @@ interface StoreActions {
   deleteUser: (id: string) => Promise<void>;
   // Funnel Columns
   refreshFunnelColumns: () => Promise<void>;
-  createFunnelColumn: (data: { label: string; color: string }) => Promise<FunnelColumn>;
-  updateFunnelColumn: (id: string, data: Partial<Pick<FunnelColumn, 'label' | 'color'>>) => Promise<FunnelColumn>;
+  createFunnelColumn: (data: { label: string; color: string; behavior?: string }) => Promise<FunnelColumn>;
+  updateFunnelColumn: (id: string, data: Partial<Pick<FunnelColumn, 'label' | 'color' | 'behavior'>>) => Promise<FunnelColumn>;
   deleteFunnelColumn: (id: string) => Promise<void>;
   reorderFunnelColumns: (columns: FunnelColumn[]) => Promise<void>;
   // Utils
@@ -413,13 +413,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isAuthenticated, authLoading, enrichProjectsWithLeads]);
 
-  const createFunnelColumn = useCallback(async (data: { label: string; color: string }) => {
+  const createFunnelColumn = useCallback(async (data: { label: string; color: string; behavior?: string }) => {
     const col = await api.funnelColumns.create(data);
     await refreshFunnelColumns();
     return col;
   }, [refreshFunnelColumns]);
 
-  const updateFunnelColumn = useCallback(async (id: string, data: Partial<Pick<FunnelColumn, 'label' | 'color'>>) => {
+  const updateFunnelColumn = useCallback(async (id: string, data: Partial<Pick<FunnelColumn, 'label' | 'color' | 'behavior'>>) => {
     const col = await api.funnelColumns.update(id, data);
     await refreshFunnelColumns();
     return col;
@@ -466,13 +466,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const moveLeadStage = useCallback(async (id: string, stage: FunnelStage) => {
     try {
       const lead = await api.leads.updateStage(id, stage);
+
+      // Check if the target column has a 'lost' behavior → archive associated project
+      const targetColumn = funnelColumns.find(c => c.id === stage);
+      if (targetColumn?.behavior === 'lost') {
+        const linkedProject = projects.find(p => p.leadId === id && p.status === 'active');
+        if (linkedProject) {
+          await api.projects.update(linkedProject.id, { status: 'archived' });
+          console.log(`[Store] Archived project ${linkedProject.id} because lead moved to '${targetColumn.label}' (behavior: lost)`);
+          await refreshProjects();
+        }
+      } else if (targetColumn?.behavior === 'active' || targetColumn?.behavior === 'won') {
+        // Reactivate project if moved back to an active/won column
+        const archivedProject = projects.find(p => p.leadId === id && p.status === 'archived');
+        if (archivedProject) {
+          await api.projects.update(archivedProject.id, { status: 'active' });
+          console.log(`[Store] Reactivated project ${archivedProject.id} because lead moved to '${targetColumn.label}'`);
+          await refreshProjects();
+        }
+      }
+
       await refreshLeads();
       return lead;
     } catch (err) {
       console.error('[Store] moveLeadStage failed:', err);
       throw err;
     }
-  }, [refreshLeads]);
+  }, [refreshLeads, refreshProjects, funnelColumns, projects]);
 
   const deleteLead = useCallback(async (id: string) => {
     try {
@@ -604,11 +624,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshTasks]);
 
   const createSprint = useCallback(async (projectId: string, data: Parameters<typeof api.sprints.create>[1]) => {
-    // 10s Timeout protection (same as updateTask) to prevent UI hanging infinitely on SQL locks
+    // 25s Timeout protection (escalated to prevent UI hanging infinitely on SQL locks or Supabase Cold Starts)
     const sprint = await Promise.race([
       api.sprints.create(projectId, data),
       new Promise<Sprint>((_, reject) => 
-        setTimeout(() => reject(new Error('A requisição para o banco de dados demorou muito tempo (Timeout). A conexão com a internet caiu ou ocorreu um bloqueio temporário no banco.')), 10000)
+        setTimeout(() => reject(new Error('A requisição para o banco de dados demorou muito tempo (Timeout). A conexão com a internet caiu ou ocorreu um bloqueio temporário no banco.')), 25000)
       )
     ]);
 

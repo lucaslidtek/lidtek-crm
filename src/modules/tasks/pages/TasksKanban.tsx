@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { useStore } from '@/shared/lib/store';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { Button } from '@/shared/components/ui/Button';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { cn } from '@/shared/utils/cn';
@@ -24,9 +25,12 @@ export function TasksKanban() {
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const { tasks, reorderTasks, deleteTask } = useStore();
+  const { user } = useAuth();
   const isMobile = useIsMobile();
 
-  const { tasksByStatus, moveTask } = useTasks({ type: typeFilter, priority: priorityFilter });
+  const [ownerFilter, setOwnerFilter] = useState<string | 'all'>('all');
+
+  const { tasksByStatus, moveTask } = useTasks({ type: typeFilter, priority: priorityFilter, ownerId: ownerFilter });
 
   // Mobile: selected status tab
   const [mobileStatus, setMobileStatus] = useState<string>('all');
@@ -92,8 +96,10 @@ export function TasksKanban() {
                 <TaskFilters
                   type={typeFilter}
                   priority={priorityFilter}
+                  ownerId={ownerFilter}
                   onTypeChange={setTypeFilter}
                   onPriorityChange={setPriorityFilter}
+                  onOwnerChange={setOwnerFilter}
                 />
               )}
               <Button onClick={() => setCreateOpen(true)} size="sm">

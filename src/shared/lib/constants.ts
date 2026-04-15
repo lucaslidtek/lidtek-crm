@@ -26,6 +26,7 @@ export const DEFAULT_FUNNEL_COLUMNS: FunnelColumn[] = FUNNEL_STAGES.map((s, i) =
   ...s,
   position: i,
   isDefault: true,
+  behavior: s.id === 'contract_signed' ? 'won' as const : s.id === 'lost' ? 'lost' as const : 'active' as const,
 }));
 
 // --- Etapas de Projeto (M2) ---

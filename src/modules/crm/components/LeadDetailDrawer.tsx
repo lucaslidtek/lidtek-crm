@@ -11,6 +11,7 @@ import { LEAD_ORIGINS, BILLING_TYPES, BILLING_CYCLES, getStageLabel, getStageCol
 import type { Lead, Interaction, ProjectType, BillingType, BillingCycle, FunnelStage } from '@/shared/types/models';
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 
 interface LeadDetailDrawerProps {
   lead: Lead | null;
@@ -538,43 +539,13 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
 
               {/* ─── Footer: Delete ─── */}
               <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                {!confirmDelete ? (
-                  <button
-                    onClick={() => setConfirmDelete(true)}
-                    className="flex items-center gap-1.5 text-[10px] text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer py-1"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    Excluir lead
-                  </button>
-                ) : (
-                  <div className="rounded-lg p-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                      <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">Tem certeza?</span>
-                    </div>
-                    <p className="text-[10px] text-red-600/80 dark:text-red-400/80 leading-relaxed">
-                      Isso excluirá permanentemente o lead
-                      {hasProject && <>, o <strong>projeto vinculado</strong>, suas sprints</>}
-                      {linkedTasks.length > 0 && <> e <strong>{linkedTasks.length} tarefa{linkedTasks.length > 1 ? 's' : ''}</strong></>}
-                      . Esta ação não pode ser desfeita.
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setConfirmDelete(false)}
-                        className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="flex-1 px-2 py-1.5 text-[10px] font-medium rounded-md bg-red-500 hover:bg-red-600 text-white transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        {deleting ? 'Excluindo...' : 'Sim, excluir tudo'}
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="flex items-center gap-1.5 text-[10px] text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer py-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Excluir lead
+                </button>
               </div>
 
               {/* Meta info */}
@@ -584,6 +555,17 @@ export function LeadDetailDrawer({ lead, onClose }: LeadDetailDrawerProps) {
               </div>
             </div>
         </div>
+      )}
+      
+      {lead && (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          onConfirm={handleDelete}
+          loading={deleting}
+          title="Excluir Lead"
+          description={`Isso excluirá permanentemente o lead${hasProject ? ', o projeto vinculado, suas sprints' : ''}${linkedTasks.length > 0 ? ' e ' + linkedTasks.length + ' tarefa' + (linkedTasks.length > 1 ? 's' : '') : ''}. Esta ação não pode ser desfeita.`}
+        />
       )}
     </MobileDrawerWrapper>
   );

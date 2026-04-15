@@ -10,6 +10,7 @@ import { Briefcase, ChevronDown, Plus, Check, Clock, CalendarDays, Trash2, Arrow
 import { cn } from '@/shared/utils/cn';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DatePicker } from '@/shared/components/ui/DatePicker';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import confetti from 'canvas-confetti';
 
 interface ProjectListViewProps {
@@ -360,6 +361,7 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
   const [completing, setCompleting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(sprint.name);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -375,6 +377,13 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
     setCompleting(true);
     try {
       await onComplete();
+      // Animação de confete conforme solicitado!
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#5A4FFF', '#10B981', '#F59E0B']
+      });
     } finally {
       setCompleting(false);
     }
@@ -594,7 +603,7 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
               )}
 
               <button
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                onClick={(e) => { e.stopPropagation(); setShowConfirmDelete(true); }}
                 className="flex-shrink-0 w-7 h-7 -mt-1 -mr-1 rounded-md flex items-center justify-center text-zinc-400 press-scale"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -746,7 +755,7 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
 
             {/* Delete button */}
             <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              onClick={(e) => { e.stopPropagation(); setShowConfirmDelete(true); }}
               className="flex-shrink-0 w-6 h-6 -mt-0.5 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 opacity-0 group-hover/sprint:opacity-100 transition-all cursor-pointer"
               title="Excluir sprint"
             >
@@ -828,6 +837,14 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
           </div>
         </div>
       </div>
+      
+      <ConfirmDialog
+        open={showConfirmDelete}
+        onOpenChange={setShowConfirmDelete}
+        onConfirm={onDelete}
+        title="Excluir Sprint"
+        description="Tem certeza que deseja excluir esta sprint? Esta ação não pode ser desfeita e pode afetar as tarefas associadas."
+      />
     </div>
   );
 }
@@ -867,14 +884,6 @@ function AddSprintRow({ projectId, onAdd, isMobile }: {
         status: 'active',
       });
       
-      // Animação de confete conforme solicitado!
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#5A4FFF', '#10B981', '#F59E0B']
-      });
-
       setName('');
       setPriority('medium');
       setDueDate('');
