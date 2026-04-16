@@ -15,6 +15,20 @@
 
 ### Tarefas Ad-Hoc
 
+#### T-AD-02: Hotfix — Dialog "Criando..." travado (FK mismatch de profile IDs)
+**Tipo:** Ad-hoc — solicitada em 2026-04-16 17:24
+**Descrição:** O Rafael (e demais usuários) têm `profiles.id` diferente do `auth.uid()`. Quando o front manda `owner_id = currentUser.id` (auth UID), o INSERT falha com FK violation porque `profiles.id` ≠ `auth.uid()`. O dialog fica travado em "Criando..." porque o erro não é visível.
+**Root Cause:** Profile IDs criados manualmente não coincidem com auth.uid() do Supabase.
+**Critérios de aceite:**
+- [x] `profiles.id` do Rafael e demais usuários atualizados para coincidir com `auth.uid()`
+- [x] Todos os registros (leads, tasks, projects) com owner_id atualizados em cascade
+- [x] `createLead` e `createTask` passam a funcionar para as contas afetadas
+- [x] Timeout de 15s adicionado ao `createLead` e `createTask` (igual ao createSprint) para evitar hang infinito
+**Sensores rodados:** [x] type-check (0 erros novos) [ ] lint [ ] testes [ ] build
+**Status:** ✅ Concluído
+
+---
+
 #### T-AD-01: Limpeza de Débito Técnico (TSC)
 **Tipo:** Ad-hoc — solicitada em 2026-04-15 17:22
 **Descrição:** Corrigir 6 erros de TypeScript pré-existentes identificados pelo sensor harness:check.

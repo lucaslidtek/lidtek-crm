@@ -9,7 +9,9 @@ import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { useStore } from '@/shared/lib/store';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { Button } from '@/shared/components/ui/Button';
+import { FloatingActionButton } from '@/shared/components/ui/FloatingActionButton';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { cn } from '@/shared/utils/cn';
 import { TASK_STATUSES } from '@/shared/lib/constants';
@@ -102,10 +104,12 @@ export function TasksKanban() {
                   onOwnerChange={setOwnerFilter}
                 />
               )}
-              <Button onClick={() => setCreateOpen(true)} size="sm">
-                <Plus className="w-4 h-4" />
-                {isMobile ? 'Nova' : 'Nova Tarefa'}
-              </Button>
+              {!isMobile && (
+                <Button onClick={() => setCreateOpen(true)} size="sm">
+                  <Plus className="w-4 h-4" />
+                  Nova Tarefa
+                </Button>
+              )}
             </>
           }
         />
@@ -223,6 +227,15 @@ export function TasksKanban() {
         cancelLabel="Cancelar"
         variant="danger"
       />
+
+      {/* Mobile FAB */}
+      {isMobile && (
+        <FloatingActionButton
+          onClick={() => setCreateOpen(true)}
+          icon={<Plus className="w-5 h-5" />}
+          label="Nova Tarefa"
+        />
+      )}
     </div>
   );
 }

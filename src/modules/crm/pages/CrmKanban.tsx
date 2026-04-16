@@ -13,6 +13,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { ViewToggle, type ViewType } from '@/shared/components/ui/ViewToggle';
 import { LeadListView } from '@/modules/crm/components/LeadListView';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
+import { FloatingActionButton } from '@/shared/components/ui/FloatingActionButton';
 import { cn } from '@/shared/utils/cn';
 import type { Lead, FunnelColumn, ColumnBehavior } from '@/shared/types/models';
 
@@ -125,10 +126,12 @@ export function CrmKanban() {
           actions={
             <>
               {!isMobile && <ViewToggle view={view} onChange={setView} views={['kanban', 'list']} />}
-              <Button onClick={() => setCreateOpen(true)} size="sm">
-                <Plus className="w-4 h-4" />
-                {isMobile ? 'Novo' : 'Novo Lead'}
-              </Button>
+              {!isMobile && (
+                <Button onClick={() => setCreateOpen(true)} size="sm">
+                  <Plus className="w-4 h-4" />
+                  Novo Lead
+                </Button>
+              )}
             </>
           }
         />
@@ -246,6 +249,15 @@ export function CrmKanban() {
           column={editingColumn}
           onSave={handleColumnSave}
           onDelete={editingColumn && !editingColumn.isDefault ? handleColumnDelete : undefined}
+        />
+      )}
+
+      {/* Mobile FAB */}
+      {isMobile && (
+        <FloatingActionButton
+          onClick={() => setCreateOpen(true)}
+          icon={<Plus className="w-5 h-5" />}
+          label="Novo Lead"
         />
       )}
     </div>

@@ -73,7 +73,7 @@ type StoreContextType = StoreState & StoreActions;
 const STORE_CACHE_KEY = 'lidtek-crm-store-cache';
 // Increment this whenever the data shape changes (e.g. ownerId → ownerIds)
 // to auto-invalidate stale caches that would crash the app.
-const STORE_CACHE_VERSION = 2;
+const STORE_CACHE_VERSION = 3; // bumped: profile IDs normalized to auth.uid() (2026-04-16)
 
 type CacheShape = {
   leads: Lead[];
@@ -441,14 +441,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createLead = useCallback(async (data: Parameters<typeof api.leads.create>[0]) => {
-    try {
-      const lead = await api.leads.create(data);
-      await refreshLeads();
-      return lead;
-    } catch (err) {
-      console.error('[Store] createLead failed:', err);
-      throw err;
-    }
+    // 15s timeout — prevents the dialog from hanging forever on FK violations or DB issues
+    const lead = await Promise.race([
+      api.leads.create(data),
+      new Promise<Lead>((_, reject) =>
+        setTimeout(() => reject(new Error('A criação do lead demorou muito (Timeout). Verifique sua conexão ou tente novamente.')), 15000)
+      )
+    ]);
+    await refreshLeads();
+    return lead;
   }, [refreshLeads]);
 
   const updateLead = useCallback(async (id: string, data: Partial<Lead>) => {
@@ -530,14 +531,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshAll, projects, tasks]);
 
   const createTask = useCallback(async (data: Parameters<typeof api.tasks.create>[0]) => {
-    try {
-      const task = await api.tasks.create(data);
-      await refreshTasks();
-      return task;
-    } catch (err) {
-      console.error('[Store] createTask failed:', err);
-      throw err;
-    }
+    // 15s timeout — prevents the dialog from hanging forever on FK violations or DB issues
+    const task = await Promise.race([
+      api.tasks.create(data),
+      new Promise<Task>((_, reject) =>
+        setTimeout(() => reject(new Error('A criação da tarefa demorou muito (Timeout). Verifique sua conexão ou tente novamente.')), 15000)
+      )
+    ]);
+    await refreshTasks();
+    return task;
   }, [refreshTasks]);
 
   const updateTask = useCallback(async (id: string, data: Partial<Task>) => {

@@ -6,13 +6,13 @@
 
 ## Estado Atual do Projeto
 
-**Última atualização:** 2026-04-15 17:28 (BRT)
-**Sprint ativo:** T-AD-01 (Limpeza de Débito Técnico)
+**Última atualização:** 2026-04-16 17:30 (BRT)
+**Sprint ativo:** T-AD-02 (Hotfix — Dialog "Criando..." travado)
 **Status geral:** ✅ PASSOU
 
 ### Saúde do Projeto
-- **Status do Build:** ✅ PASSOU (`tsc --noEmit` limpo)
-- **Harness Sensors:** 🟢 `harness:check` validado e passando por padrão.
+- **Status do Build:** ✅ `tsc --noEmit` sem errors novos (erros de TeamPage pré-existentes documentados)
+- **Harness Sensors:** 🟢 type-check validado e passando.
 
 ---
 
@@ -157,6 +157,7 @@ Na sessão de 2026-04-13 (noite), o app recebeu otimização de performance comp
 
 | Data | Agente | O que foi feito | Commit |
 |------|--------|-----------------|--------|
+| 2026-04-16 | Implementador | Hotfix T-AD-02: corrigido profile_id mismatch para Rafael, André e Henrique (migration SQL); timeout 15s em createLead/createTask | pendente |
 | 2026-04-13 (manhã) | Implementador | Persistência de dados (T-01 a T-07) + Segurança whitelist (T-08 a T-18) + Docs (T-19, T-20) | pendente |
 | 2026-04-13 (tarde) | Implementador | PWA completo: plugin, ícones, manifest, SW, install prompt (T-01 a T-07) | pendente |
 | 2026-04-13 (noite) | Implementador | Performance Turbo: splash, cache-first auth, lazy routes, store persistence, API parallel (T-01 a T-06) | pendente |
