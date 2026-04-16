@@ -1,46 +1,34 @@
 import { type ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { cn } from '@/shared/utils/cn';
 
 interface FloatingActionButtonProps {
   onClick: () => void;
   icon: ReactNode;
-  label?: string;
   className?: string;
 }
 
 /**
  * Mobile-only floating action button (FAB).
- * Sits above the bottom nav bar (safe-area aware via `bottom-20`).
- * On desktop this renders nothing.
+ * Uses createPortal to escape parent transform/overflow contexts (same pattern as Dashboard).
+ * Renders as a plain circle — no label, no animation.
  */
-export function FloatingActionButton({ onClick, icon, label, className }: FloatingActionButtonProps) {
-  return (
-    <motion.button
+export function FloatingActionButton({ onClick, icon, className }: FloatingActionButtonProps) {
+  return createPortal(
+    <button
       onClick={onClick}
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0, opacity: 0 }}
-      whileTap={{ scale: 0.92 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+      style={{ WebkitTapHighlightColor: 'transparent' }}
       className={cn(
-        // Positioning — above the bottom nav (h-16 nav + 4 gap = ~72px → bottom-20)
-        'fixed bottom-20 right-4 z-40',
-        // Shape & color
-        'flex items-center gap-2 px-4 h-12 rounded-2xl shadow-xl',
+        'fixed right-4 z-40 w-14 h-14 rounded-full',
+        'bottom-[calc(env(safe-area-inset-bottom,0px)+5.5rem)]',
         'bg-primary text-white',
-        'active:scale-95 transition-transform',
+        'flex items-center justify-center',
+        'shadow-xl press-scale',
         className,
       )}
     >
-      <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-        {icon}
-      </span>
-      {label && (
-        <span className="text-sm font-semibold tracking-tight whitespace-nowrap">
-          {label}
-        </span>
-      )}
-    </motion.button>
+      {icon}
+    </button>,
+    document.body,
   );
 }

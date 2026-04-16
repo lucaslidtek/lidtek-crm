@@ -189,12 +189,7 @@ export function TeamPage() {
       </div>
 
       <div className={cn('flex flex-1 min-h-0', !isMobile && 'gap-4')}>
-        <div className={cn(
-          'flex-1 min-w-0 overflow-y-auto h-full rounded-xl',
-          !isMobile
-            ? 'bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40'
-            : 'glass',
-        )}>
+        <div className="flex-1 min-w-0 overflow-y-auto h-full rounded-xl glass">
           {filteredMembers.length > 0 ? (
             <AnimatePresence mode="popLayout">
               {groupedMembers.map((group) => (
