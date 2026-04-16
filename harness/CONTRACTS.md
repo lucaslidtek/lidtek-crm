@@ -15,6 +15,23 @@
 
 ### Tarefas Ad-Hoc
 
+#### T-AD-03: Realtime — Sprints/Projects/Tasks aparecem em tempo real para todos os usuários
+**Tipo:** Ad-hoc — solicitada em 2026-04-16 17:43
+**Descrição:** Quando um usuário cria uma sprint ou task, os outros usuários conectados não veem a mudança sem recarregar. Isso ocorre porque o store usa apenas fetch inicial + visibilitychange. É necessário adicionar subscriptions Supabase Realtime nos channels de `projects` e `tasks` para disparar refreshes no store de todos os clientes conectados automaticamente.
+**Root Cause:** Store não possui Supabase Realtime subscriptions — depende apenas de fetch manual e visibilitychange.
+**Critérios de aceite:**
+- [x] Quando usuário A cria uma sprint, usuário B vê a sprint aparecer sem recarregar (<3s)
+- [x] Quando usuário A cria uma task, usuário B vê a task aparecer sem recarregar
+- [x] Quando usuário A deleta/atualiza sprint ou task, usuário B reflete a mudança
+- [x] Subscriptions são limpas corretamente no unmount (sem memory leak)
+- [x] Subscriptions só ficam ativas quando o usuário está autenticado
+**Arquivos modificados:** `src/shared/lib/store.tsx`
+**Sensores rodados:** [x] type-check (0 erros novos) [ ] lint [ ] testes [ ] build
+**Status:** ✅ Concluído
+
+---
+
+
 #### T-AD-02: Hotfix — Dialog "Criando..." travado (FK mismatch de profile IDs)
 **Tipo:** Ad-hoc — solicitada em 2026-04-16 17:24
 **Descrição:** O Rafael (e demais usuários) têm `profiles.id` diferente do `auth.uid()`. Quando o front manda `owner_id = currentUser.id` (auth UID), o INSERT falha com FK violation porque `profiles.id` ≠ `auth.uid()`. O dialog fica travado em "Criando..." porque o erro não é visível.

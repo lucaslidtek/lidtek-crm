@@ -6,8 +6,8 @@
 
 ## Estado Atual do Projeto
 
-**Última atualização:** 2026-04-16 17:30 (BRT)
-**Sprint ativo:** T-AD-02 (Hotfix — Dialog "Criando..." travado)
+**Última atualização:** 2026-04-16 17:45 (BRT)
+**Sprint ativo:** T-AD-03 (Realtime — Sprints/Projects/Tasks em tempo real)
 **Status geral:** ✅ PASSOU
 
 ### Saúde do Projeto

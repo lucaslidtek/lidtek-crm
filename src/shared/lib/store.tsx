@@ -414,6 +414,73 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isAuthenticated, authLoading, enrichProjectsWithLeads]);
 
+  // ─── Supabase Realtime subscriptions ───────────────────────────────────────
+  // When a teammate creates/updates/deletes a sprint, task or project, ALL
+  // connected clients receive a postgres_changes event and silently re-fetch
+  // the affected collection — no page reload required.
+  //
+  // Debounce: multiple rapid events (e.g. createSprint → auto-create task)
+  // are collapsed into a single refresh call fired 600ms after the last event.
+  // This avoids 4-5 consecutive API calls hammering the server.
+  // ─────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+
+    // Debounce timers
+    let projectsTimer: ReturnType<typeof setTimeout> | null = null;
+    let tasksTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleProjectsRefresh = () => {
+      if (projectsTimer) clearTimeout(projectsTimer);
+      projectsTimer = setTimeout(() => {
+        refreshProjects().catch(err =>
+          console.warn('[Realtime] projects refresh failed:', err)
+        );
+      }, 600);
+    };
+
+    const scheduleTasksRefresh = () => {
+      if (tasksTimer) clearTimeout(tasksTimer);
+      tasksTimer = setTimeout(() => {
+        refreshTasks().catch(err =>
+          console.warn('[Realtime] tasks refresh failed:', err)
+        );
+      }, 600);
+    };
+
+    // Channel: projects + sprints (sprints are embedded in projects via JSON/FK)
+    const projectsChannel = supabase
+      .channel('realtime:projects')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projects' },
+        () => scheduleProjectsRefresh()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sprints' },
+        () => scheduleProjectsRefresh()
+      )
+      .subscribe();
+
+    // Channel: tasks
+    const tasksChannel = supabase
+      .channel('realtime:tasks')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        () => scheduleTasksRefresh()
+      )
+      .subscribe();
+
+    return () => {
+      if (projectsTimer) clearTimeout(projectsTimer);
+      if (tasksTimer) clearTimeout(tasksTimer);
+      supabase.removeChannel(projectsChannel);
+      supabase.removeChannel(tasksChannel);
+    };
+  }, [isAuthenticated, authLoading, refreshProjects, refreshTasks]);
+
   const createFunnelColumn = useCallback(async (data: { label: string; color: string; behavior?: string }) => {
     const col = await api.funnelColumns.create(data);
     await refreshFunnelColumns();
