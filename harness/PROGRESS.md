@@ -157,6 +157,8 @@ Na sessão de 2026-04-13 (noite), o app recebeu otimização de performance comp
 
 | Data | Agente | O que foi feito | Commit |
 |------|--------|-----------------|--------|
+| 2026-04-16 | Implementador | Hotfix T-AD-04 (pt2): removida FK `tasks_owner_id_fkey`, `leads_owner_id_fkey`, `projects_owner_id_fkey` (campos legados); corrigidos owner_ids corrompidos em tasks (3) e projects (3) via array_replace | pendente |
+| 2026-04-16 | Implementador | Hotfix T-AD-04: corrigida policy RLS `tasks_update` — USING agora usa `is_member()`, WITH CHECK garante que admins/gestores editam qualquer task independente de `owner_id` legado | pendente |
 | 2026-04-16 | Implementador | Hotfix T-AD-02: corrigido profile_id mismatch para Rafael, André e Henrique (migration SQL); timeout 15s em createLead/createTask | pendente |
 | 2026-04-13 (manhã) | Implementador | Persistência de dados (T-01 a T-07) + Segurança whitelist (T-08 a T-18) + Docs (T-19, T-20) | pendente |
 | 2026-04-13 (tarde) | Implementador | PWA completo: plugin, ícones, manifest, SW, install prompt (T-01 a T-07) | pendente |

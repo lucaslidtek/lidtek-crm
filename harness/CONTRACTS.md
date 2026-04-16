@@ -15,6 +15,21 @@
 
 ### Tarefas Ad-Hoc
 
+#### T-AD-04: Hotfix — Timeout ao salvar tarefa (RLS UPDATE blocks admin via owner_id check)
+**Tipo:** Ad-hoc — solicitada em 2026-04-16 21:05
+**Descrição:** Lucas (admin) não consegue salvar tarefas criadas por outros usuários. O `tasks_update` RLS verifica `owner_id = auth.uid()` mas tasks antigas têm `owner_id` com IDs pré-migração. A condição `get_user_role() = 'admin'` deveria bastar, mas a policy `with_check` também avalia `owner_id` no UPDATE. O timeout de 10s no `updateTask` dispara porque o UPDATE não retorna nenhuma linha (RLS silenciosamente bloqueia → `.single()` trava esperando). Fix: Atualizar a policy RLS `tasks_update` para usar `is_member()` como USING (semelhante ao SELECT) e manter admin/gestor com acesso total no WITH CHECK.
+**Root Cause:** `tasks_update` policy tem `with_check` que falha para admins editando tasks de outros porque `owner_id` (campo legado) não coincide com `auth.uid()`.
+**Critérios de aceite:**
+- [x] Lucas consegue salvar tarefas de Rafael (e qualquer outro membro) sem timeout
+- [x] RLS continua protegendo: apenas membros autenticados podem atualizar tasks
+- [x] Admins/gestores podem editar qualquer task
+- [x] Collaborators só editam suas próprias tasks
+**Arquivos modificados:** Supabase RLS policy (migration SQL)
+**Sensores rodados:** [x] migration aplicada com sucesso [ ] type-check [ ] lint [ ] testes [ ] build
+**Status:** ✅ Concluído
+
+---
+
 #### T-AD-03: Realtime — Sprints/Projects/Tasks aparecem em tempo real para todos os usuários
 **Tipo:** Ad-hoc — solicitada em 2026-04-16 17:43
 **Descrição:** Quando um usuário cria uma sprint ou task, os outros usuários conectados não veem a mudança sem recarregar. Isso ocorre porque o store usa apenas fetch inicial + visibilitychange. É necessário adicionar subscriptions Supabase Realtime nos channels de `projects` e `tasks` para disparar refreshes no store de todos os clientes conectados automaticamente.
