@@ -22,8 +22,9 @@ declare global {
 if (!globalThis.__supabaseClient) {
   globalThis.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-      // Use implicit flow — no navigator locks, works perfectly for SPAs
-      flowType: 'implicit',
+      // PKCE is the recommended flow for SPAs — uses secure code exchange via query params.
+      // Implicit flow (hash fragments) was deprecated by OAuth 2.1 and is unreliable on redirect.
+      flowType: 'pkce',
       // Use localStorage instead of IndexedDB to avoid lock contention
       storage: typeof window !== 'undefined' ? window.localStorage : undefined,
       storageKey: 'sb-lidtek-auth',
@@ -31,7 +32,7 @@ if (!globalThis.__supabaseClient) {
       persistSession: true,
       // Auto-refresh JWT before it expires — MUST be explicit (R2)
       autoRefreshToken: true,
-      // Detect session from URL for OAuth callbacks
+      // Detect session from URL for OAuth callbacks (PKCE code + implicit hash)
       detectSessionInUrl: true,
       // Bypass navigator.locks (causes "Lock was not released within 5000ms" on HMR).
       // Instead of null, provide a real function that just runs fn() directly.

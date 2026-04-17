@@ -267,9 +267,30 @@
   }
 }
 
-/* Safe area bottom padding */
+/* Safe area bottom padding — used for generic lists / scroll content */
 @utility safe-bottom {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 1.5rem);
+}
+
+/* ── Sheet Sticky Footer — use on bottom-pinned action bars inside bottom sheets ── */
+/* Must be a real CSS class (not @utility) to preserve env() in Tailwind v4 compilation */
+.sheet-footer-safe {
+  padding-top: 1rem;
+  padding-bottom: 1.5rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+@supports (padding-bottom: constant(safe-area-inset-bottom)) {
+  .sheet-footer-safe {
+    padding-bottom: calc(1.5rem + constant(safe-area-inset-bottom));
+  }
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .sheet-footer-safe {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* ═══ iOS Safe Area — real CSS classes (NOT @utility) ═══
@@ -290,6 +311,39 @@
 @supports (padding-top: env(safe-area-inset-top)) {
   .topbar-safe-top {
     padding-top: calc(0.5rem + env(safe-area-inset-top));
+  }
+}
+
+/* ── Page content: clears bottom nav bar + iPhone home indicator ── */
+.page-content-safe {
+  padding-bottom: 8rem; /* 128px — clears tab bar on mobile */
+}
+
+@media (min-width: 768px) {
+  .page-content-safe {
+    padding-bottom: 1.5rem; /* desktop: small bottom buffer */
+  }
+}
+
+@supports (padding-bottom: constant(safe-area-inset-bottom)) {
+  .page-content-safe {
+    padding-bottom: calc(8rem + constant(safe-area-inset-bottom));
+  }
+  @media (min-width: 768px) {
+    .page-content-safe {
+      padding-bottom: calc(1.5rem + constant(safe-area-inset-bottom));
+    }
+  }
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .page-content-safe {
+    padding-bottom: calc(8rem + env(safe-area-inset-bottom));
+  }
+  @media (min-width: 768px) {
+    .page-content-safe {
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    }
   }
 }
 

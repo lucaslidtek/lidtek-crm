@@ -2,12 +2,16 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { useLocation } from 'wouter';
 import { type ReactNode, useEffect } from 'react';
 
-/** Check if the current URL contains OAuth callback tokens (implicit or PKCE). */
+/**
+ * Check if the current URL contains an OAuth PKCE callback code.
+ * During PKCE flow, Supabase redirects back with ?code=... in the query string.
+ * We must NOT redirect to /login while this code is being exchanged.
+ */
 function isOAuthCallback(): boolean {
-  // Implicit flow: hash contains access_token
-  if (window.location.hash.includes('access_token=')) return true;
   // PKCE flow: query contains code
   if (new URLSearchParams(window.location.search).has('code')) return true;
+  // Implicit flow (legacy): hash contains access_token
+  if (window.location.hash.includes('access_token=')) return true;
   return false;
 }
 
@@ -21,8 +25,9 @@ export function PrivateRoute({ children }: { children: ReactNode }) {
       setLocation('/access-denied');
       return;
     }
-    // NEVER redirect to /login while an OAuth callback is being processed —
-    // the AuthProvider needs time to exchange the token / process the hash.
+    // NEVER redirect to /login while:
+    // 1. Auth is still loading (INITIAL_SESSION hasn't fired yet)
+    // 2. An OAuth callback is being processed (?code= in URL)
     if (!isLoading && !isAuthenticated && !isOAuthCallback()) {
       setLocation('/login');
     }
@@ -32,6 +37,9 @@ export function PrivateRoute({ children }: { children: ReactNode }) {
     return null;
   }
 
+  // Show spinner while:
+  // - Auth state is being determined (isLoading)
+  // - OAuth callback is in progress (?code= in URL being exchanged)
   if (isLoading || isOAuthCallback()) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">

@@ -34,7 +34,7 @@ export function PageLayout({ children }: PageLayoutProps) {
         <TopBar />
 
         {/* Page content with subtle transition */}
-        <div className="flex-1 p-3 sm:p-4 md:p-6 pb-32 md:pb-6">
+        <div className="flex-1 p-3 sm:p-4 md:p-6 page-content-safe">
           <AnimatePresence mode="wait">
             <motion.div
               key={location}

@@ -3,7 +3,7 @@ import type { User } from '@/shared/types/models';
 import { supabase } from '@/shared/lib/supabase';
 
 // ============================================
-// AUTH — Supabase Google OAuth (PKCE-safe)
+// AUTH — Supabase Google OAuth (PKCE)
 // Turbo: Cache-first instant loading
 // ============================================
 
@@ -54,20 +54,6 @@ function authUserToProfile(authUser: { id: string; email?: string; user_metadata
   };
 }
 
-// One-time migration: clear session that may have been corrupted by dev auto-login hack.
-// This runs once, forces a clean re-login with Google, then never runs again.
-const AUTH_MIGRATION_KEY = 'lidtek-crm-auth-v2';
-if (!localStorage.getItem(AUTH_MIGRATION_KEY)) {
-  localStorage.removeItem(AUTH_STORAGE_KEY);
-  // Clear Supabase's own session storage
-  for (const key of Object.keys(localStorage)) {
-    if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-      localStorage.removeItem(key);
-    }
-  }
-  localStorage.setItem(AUTH_MIGRATION_KEY, '1');
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize user from localStorage for instant HMR UX — no flash-to-login.
   const [user, setUser] = useState<User | null>(() => {
@@ -99,7 +85,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loadProfile = useCallback(async (authUser: { id: string; email?: string; user_metadata?: Record<string, string> }) => {
+  /**
+   * Loads or refreshes the user profile from the database.
+   * Returns true if user was authorized, false if denied/not found.
+   * IMPORTANT: Always calls resolveLoading() at the end to prevent race conditions.
+   */
+  const loadProfile = useCallback(async (
+    authUser: { id: string; email?: string; user_metadata?: Record<string, string> }
+  ): Promise<boolean> => {
     // Build a fallback from JWT metadata — always available, no DB needed
     const fallback = authUserToProfile(authUser);
 
@@ -124,11 +117,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select('*')
           .ilike('email', `%${safeEmail}%`)
           .limit(1);
-        
+
         if (existingByEmails && existingByEmails.length > 0) {
           existing = existingByEmails[0];
-          // We could try to sync the IDs here, but keeping the email mapping is safer
-          // since the random UUID might already be used as an owner_id in projects/tasks.
         } else if (emailError) {
           error = emailError;
         }
@@ -136,13 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         // RLS or DB error — DON'T block access, use JWT fallback.
-        // This can happen if: is_member() function doesn't exist, policy
-        // conflict, network error, etc. Blocking here would lock everyone out.
         console.error('[Auth] Profile query error (using fallback):', error.message);
         setUser(fallback);
         setAccessDenied(false);
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
-        return;
+        // resolveLoading is called by the caller
+        return true;
       }
 
       if (existing) {
@@ -179,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAccessDenied(false);
         setDeniedEmail(null);
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
+        return true;
       } else {
         // data is null AND no error → profile genuinely doesn't exist.
         // ── WHITELIST BLOCK ──
@@ -188,224 +179,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDeniedEmail(authUser.email ?? null);
         localStorage.removeItem(AUTH_STORAGE_KEY);
         await supabase.auth.signOut();
+        return false;
       }
     } catch (err) {
       // Network/unexpected error — use JWT metadata as temporary fallback
       console.error('[Auth] Profile check failed (using fallback):', err);
       setUser(fallback);
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fallback));
+      return true;
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    // Safety net: if nothing resolves in 2s (was 5s), force loading=false
+    // Safety net: if nothing resolves in 4s, force loading=false
+    // (was 2s before, increased to give PKCE code exchange time)
     const safetyTimeout = setTimeout(() => {
       if (mounted) resolveLoading();
-    }, 2000);
+    }, 4000);
 
-    // ── Custom OAuth: handle Google ID token from /api/auth/callback ──
-    // When user returns from our custom Google OAuth flow (via Vercel serverless),
-    // the URL contains a google_id_token that we exchange for a Supabase session.
-    const searchParams = new URLSearchParams(window.location.search);
-    const googleIdToken = searchParams.get('google_id_token');
-    const authError = searchParams.get('auth_error');
-
-    if (googleIdToken) {
-      // Clean URL immediately (remove token from browser bar and history)
-      window.history.replaceState({}, '', window.location.pathname);
-
-      // Exchange Google ID token for a Supabase session
-      supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: googleIdToken,
-      }).then(async ({ data, error }) => {
-        if (!mounted) return;
-        if (!error && data.session?.user) {
-          await loadProfile(data.session.user as Parameters<typeof loadProfile>[0]);
-        } else {
-          console.error('[Auth] signInWithIdToken failed:', error?.message);
-        }
-        resolveLoading();
-      }).catch((err) => {
-        console.error('[Auth] signInWithIdToken error:', err);
-        if (mounted) resolveLoading();
-      });
-
-      // Subscribe to future auth changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          if (!mounted) return;
-          if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
-            await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-          } else if (event === 'SIGNED_OUT') {
-            setTimeout(() => {
-              if (!mounted) return;
-              supabase.auth.getUser().then(({ data: { user } }) => {
-                if (!user) {
-                  setUser(null);
-                  localStorage.removeItem(AUTH_STORAGE_KEY);
-                }
-              });
-            }, 300);
-          }
-          resolveLoading();
-        }
-      );
-
-      return () => {
-        mounted = false;
-        clearTimeout(safetyTimeout);
-        subscription.unsubscribe();
-      };
-    }
-
-    if (authError) {
-      // Clean error from URL
-      window.history.replaceState({}, '', window.location.pathname);
-      console.error('[Auth] OAuth error:', authError);
-    }
-
-    // ── TURBO: Cached user fast-path ──
-    // If we have a cached user, isLoading is already false (resolved in useState).
-    // We still validate the session in background but the UI renders immediately.
-    const cachedUser = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (cachedUser) {
-      // Background validation — non-blocking, UI already rendered
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!mounted) return;
-        const isExpired = session?.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
-
-        if (session?.user && !isExpired) {
-          // Silent profile refresh in background
-          loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-        } else if (session?.user && isExpired) {
-          // Token expired — try to refresh
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (!mounted) return;
-            if (user) {
-              loadProfile(user as Parameters<typeof loadProfile>[0]);
-            } else {
-              // Session truly dead — clear and redirect
-              setUser(null);
-              localStorage.removeItem(AUTH_STORAGE_KEY);
-              resolveLoading(); // Force loading state for redirect
-            }
-          });
-          return;
-        } else {
-          // No session — clear cache, force re-login
-          setUser(null);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-        }
-        resolveLoading();
-      }).catch(() => {
-        if (mounted) resolveLoading();
-      });
-
-      // Subscribe for future auth changes (logout, token refresh)
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          if (!mounted) return;
-          if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
-            await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-          } else if (event === 'SIGNED_OUT' || (event as string) === 'TOKEN_REFRESH_FAILED') {
-            // Guard: only clear if truly signed out or refresh permanently failed.
-            // Wait briefly to see if TOKEN_REFRESHED follows or check with server.
-            setTimeout(() => {
-              if (!mounted) return;
-              // Use getUser() here instead of getSession() because getSession may return a dead cached token.
-              supabase.auth.getUser().then(({ data: { user } }) => {
-                if (!user) {
-                  setUser(null);
-                  localStorage.removeItem(AUTH_STORAGE_KEY);
-                }
-              });
-            }, 300);
-          }
-          resolveLoading();
-        }
-      );
-      return () => {
-        mounted = false;
-        clearTimeout(safetyTimeout);
-        subscription.unsubscribe();
-      };
-    }
-
-    // ── Cold start (first login or after logout) ──
-    // No cache — must call getSession() to exchange PKCE code or restore session.
-
-    // R2 defensive: try PKCE code exchange first if present in URL
-    const urlCode = new URLSearchParams(window.location.search).get('code');
-    if (urlCode) {
-      supabase.auth.exchangeCodeForSession(urlCode).then(async ({ data, error }) => {
-        if (!mounted) return;
-        if (!error && data.session?.user) {
-          await loadProfile(data.session.user as Parameters<typeof loadProfile>[0]);
-          resolveLoading();
-          // Clean the URL after successful exchange
-          window.history.replaceState({}, '', window.location.pathname);
-        } else {
-          // PKCE exchange failed — fallback to getSession
-          fallbackGetSession();
-        }
-      }).catch(() => {
-        // PKCE exchange error — fallback to getSession
-        if (mounted) fallbackGetSession();
-      });
-    } else {
-      fallbackGetSession();
-    }
-
-    function fallbackGetSession() {
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
-        if (!mounted) return;
-        const isExpired = session?.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
-
-        if (session?.user && !isExpired) {
-          await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
-        } else if (session?.user && isExpired) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            await loadProfile(user as Parameters<typeof loadProfile>[0]);
-          } else {
-            setUser(null);
-            localStorage.removeItem(AUTH_STORAGE_KEY);
-          }
-        } else {
-          setUser(null);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-        }
-        resolveLoading();
-      }).catch(() => {
-        if (mounted) resolveLoading();
-      });
-    }
-
-    // ---- Step 2: onAuthStateChange ----
-    // Handles SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED after the initial load.
+    // ── onAuthStateChange is the SINGLE source of truth ──
+    // Supabase's detectSessionInUrl:true handles PKCE code exchange automatically.
+    // We don't need to manually detect ?code= or #access_token= — Supabase fires
+    // SIGNED_IN on the onAuthStateChange listener after it processes the URL.
+    //
+    // This eliminates the race condition where we were calling resolveLoading()
+    // before setUser() had committed to React state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
+
+        console.log('[Auth] onAuthStateChange:', event, session?.user?.email ?? 'no user');
+
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
           await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+          // resolveLoading AFTER setUser is committed via loadProfile
+          resolveLoading();
+        } else if (event === 'INITIAL_SESSION') {
+          // Fired on mount — either has a session or null
+          if (session?.user) {
+            await loadProfile(session.user as Parameters<typeof loadProfile>[0]);
+          } else {
+            // No session on startup
+            setUser(null);
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+          }
+          resolveLoading();
         } else if (event === 'SIGNED_OUT' || (event as string) === 'TOKEN_REFRESH_FAILED') {
-          // Guard: wait briefly before clearing to distinguish a real logout
-          // from a transient SIGNED_OUT that occurs during token refresh.
+          // Guard: only clear if truly signed out.
+          // Wait briefly to distinguish a real logout from a transient event during token refresh.
           setTimeout(() => {
             if (!mounted) return;
-            supabase.auth.getUser().then(({ data: { user } }) => {
-              if (!user) {
+            supabase.auth.getUser().then(({ data: { user: u } }) => {
+              if (!u) {
                 setUser(null);
                 localStorage.removeItem(AUTH_STORAGE_KEY);
               }
             });
           }, 300);
+          resolveLoading();
         }
-        // Always ensure loading is resolved (safety net for edge cases)
-        resolveLoading();
       }
     );
 
@@ -420,11 +254,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cached = localStorage.getItem(AUTH_STORAGE_KEY);
       if (!cached) return;
 
-      supabase.auth.getUser().then(({ data: { user } }) => {
+      supabase.auth.getUser().then(({ data: { user: u } }) => {
         if (!mounted) return;
-        if (user) {
+        if (u) {
           // Session is still alive — reload profile in case token was refreshed
-          loadProfile(user as Parameters<typeof loadProfile>[0]);
+          loadProfile(u as Parameters<typeof loadProfile>[0]);
         } else {
           // Session died while tab was hidden — clean up
           setUser(null);
@@ -445,21 +279,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   const login = useCallback(() => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    if (isLocal) {
-      // Local development: Vercel serverless functions aren't available,
-      // fall back to Supabase's built-in OAuth
-      supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin },
-      });
-    } else {
-      // Production (Vercel): use our custom OAuth flow via serverless functions.
-      // This makes Google's consent screen show our Vercel domain
-      // instead of the ugly Supabase hash URL.
-      window.location.href = '/api/auth/google';
-    }
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // Always redirect back to the app origin.
+        // In dev: http://localhost:5173
+        // In prod (Vercel): https://your-domain.com
+        redirectTo: window.location.origin,
+      },
+    });
   }, []);
 
   const loginWithPassword = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {

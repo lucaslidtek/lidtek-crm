@@ -65,7 +65,7 @@ export function MobileDrawerWrapper({
               </div>
 
               {/* Content — the drawer's own header provides the close button */}
-              <div className="flex-1 overflow-y-auto overscroll-contain safe-bottom">
+              <div className="flex-1 overflow-y-auto overscroll-contain pb-[max(2rem,env(safe-area-inset-bottom,2rem))]">
                 {children}
               </div>
             </motion.div>

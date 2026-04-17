@@ -46,10 +46,10 @@ export function DialogContent({
                 'fixed bottom-0 left-0 right-0 z-50',
                 'w-full max-h-[90vh]',
                 'bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800',
-                'rounded-t-2xl p-6 pt-3',
-                'shadow-2xl overflow-y-auto',
+                'rounded-t-2xl pt-3',
+                'shadow-2xl',
+                'flex flex-col',
                 'data-[state=open]:animate-slide-up data-[state=closed]:animate-slide-down',
-                'safe-bottom',
               ]
             : [
                 // ── Desktop: centered dialog ──
@@ -68,11 +68,18 @@ export function DialogContent({
       >
         {/* Mobile drag handle */}
         {isMobile && (
-          <div className="flex justify-center pb-3">
+          <div className="flex justify-center pb-3 flex-shrink-0">
             <div className="drag-handle" />
           </div>
         )}
-        {children}
+        {/* Scrollable content area on mobile */}
+        {isMobile ? (
+          <div className="flex-1 overflow-y-auto px-6">
+            {children}
+          </div>
+        ) : (
+          children
+        )}
         <DialogPrimitive.Close className={cn(
           'absolute rounded-lg p-1.5 text-foreground-muted hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-colors',
           isMobile ? 'right-3 top-3' : 'right-4 top-4',
@@ -107,8 +114,16 @@ export function DialogDescription({ children, className }: { children: ReactNode
 }
 
 export function DialogFooter({ children, className }: { children: ReactNode; className?: string }) {
+  const isMobile = useIsMobile();
   return (
-    <div className={cn('mt-8 flex items-center justify-end gap-3', className)}>
+    <div className={cn(
+      'flex items-center justify-end gap-3',
+      isMobile
+        // Sticky footer that clears the iPhone home indicator
+        ? 'flex-shrink-0 px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900'
+        : 'mt-8',
+      className,
+    )}>
       {children}
     </div>
   );

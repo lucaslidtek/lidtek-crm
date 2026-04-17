@@ -15,6 +15,21 @@
 
 ### Tarefas Ad-Hoc
 
+#### T-AD-05: Hotfix — Login Google redireciona de volta para tela de login (race condition + migration wipe)
+**Tipo:** Ad-hoc — solicitada em 2026-04-17 09:28
+**Descrição:** Após login com Google, o usuário é redirecionado de volta para `/login` ao invés de entrar no sistema. Root causes identificados: (1) O bloco de migração (`AUTH_MIGRATION_KEY`) apaga o `AUTH_STORAGE_KEY` a cada chamada inicial, zerando o cache de sessão — isso faz o `isLoading` iniciar como `true`; (2) Após o redirect OAuth, `resolveLoading()` é chamado antes do `setUser()` atualizar o estado React, causando um frame em que `isLoading=false` + `isAuthenticated=false` → `PrivateRoute` redireciona para `/login`; (3) O `flowType: 'implicit'` foi declarado mas o redirect URI não estava configurado para o hash fragment.
+**Root Cause:** Race condition em `resolveLoading()` vs `setUser()` + migration code que zera o cache de sessão desnecessariamente.
+**Critérios de aceite:**
+- [ ] Login com Google funciona consistentemente — entra no dashboard sem redirect de volta
+- [ ] Sessão persiste após commits/HMR (não é resetada por código de migração)
+- [ ] Sessão persiste após reload de página
+- [ ] `PrivateRoute` não redireciona para login enquanto auth está sendo processado
+**Arquivos modificados:** `src/app/providers/AuthProvider.tsx`, `src/app/PrivateRoute.tsx`, `src/shared/lib/supabase.ts`
+**Sensores rodados:** [x] type-check (0 erros novos) [ ] lint [ ] build
+**Status:** ✅ Concluído
+
+---
+
 #### T-AD-04: Hotfix — Timeout ao salvar tarefa (RLS UPDATE blocks admin via owner_id check)
 **Tipo:** Ad-hoc — solicitada em 2026-04-16 21:05
 **Descrição:** Lucas (admin) não consegue salvar tarefas criadas por outros usuários. O `tasks_update` RLS verifica `owner_id = auth.uid()` mas tasks antigas têm `owner_id` com IDs pré-migração. A condição `get_user_role() = 'admin'` deveria bastar, mas a policy `with_check` também avalia `owner_id` no UPDATE. O timeout de 10s no `updateTask` dispara porque o UPDATE não retorna nenhuma linha (RLS silenciosamente bloqueia → `.single()` trava esperando). Fix: Atualizar a policy RLS `tasks_update` para usar `is_member()` como USING (semelhante ao SELECT) e manter admin/gestor com acesso total no WITH CHECK.
