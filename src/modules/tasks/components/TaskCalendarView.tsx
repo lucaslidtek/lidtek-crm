@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { Task } from '@/shared/types/models';
 import { cn } from '@/shared/utils/cn';
-import { ChevronLeft, ChevronRight, Check, Clock, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, CalendarDays } from 'lucide-react';
 import { Badge } from '@/shared/components/ui/Badge';
 import { TASK_STATUSES } from '@/shared/lib/constants';
 
@@ -201,8 +201,25 @@ export function TaskCalendarView({ tasks, onTaskClick }: TaskCalendarViewProps) 
 
                   <div className="mt-1 flex-1 space-y-0.5 overflow-hidden">
                     {events.slice(0, 3).map((event, eIdx) => {
-                      const statusObj = TASK_STATUSES.find(s => s.id === event.task.status);
                       const isDone = event.task.status === 'done';
+                      const dueTime = event.task.dueDate ? new Date(event.task.dueDate.split('T')[0] + 'T12:00:00').getTime() : null;
+                      const nowMs = Date.now();
+                      const todayStr = formatDateKey(today);
+                      const taskDateStr = event.task.dueDate ? event.task.dueDate.split('T')[0] : '';
+                      const isOverdue = !isDone && !!dueTime && dueTime < nowMs;
+                      const isTaskToday = !isDone && taskDateStr === todayStr;
+                      
+                      // Color priority: done → overdue → today → status color
+                      const chipClass = isDone
+                        ? 'bg-emerald-500/80'
+                        : isOverdue
+                          ? 'bg-red-500'
+                          : isTaskToday
+                            ? 'bg-amber-500'
+                            : '';
+                      const chipStyle = (!isDone && !isOverdue && !isTaskToday)
+                        ? { backgroundColor: TASK_STATUSES.find(s => s.id === event.task.status)?.color ?? '#888' }
+                        : undefined;
                       
                       return (
                         <div
@@ -210,9 +227,9 @@ export function TaskCalendarView({ tasks, onTaskClick }: TaskCalendarViewProps) 
                           onClick={(e) => { e.stopPropagation(); onTaskClick(event.task); }}
                           className={cn(
                             'w-full truncate rounded px-1.5 py-0.5 text-[10px] font-medium cursor-pointer transition-all hover:brightness-110 border border-transparent hover:border-black/10 dark:hover:border-white/10 text-white',
-                            isDone ? 'bg-emerald-500/80' : ''
+                            chipClass
                           )}
-                          style={!isDone ? { backgroundColor: statusObj?.color ?? '#888' } : undefined}
+                          style={chipStyle}
                           title={event.task.title}
                         >
                           {event.task.title}
@@ -250,6 +267,23 @@ export function TaskCalendarView({ tasks, onTaskClick }: TaskCalendarViewProps) 
             {selectedDayEvents.map((event, idx) => {
               const isCompleted = event.task.status === 'done';
               const statusObj = TASK_STATUSES.find(s => s.id === event.task.status);
+              const dueTime = event.task.dueDate ? new Date(event.task.dueDate.split('T')[0] + 'T12:00:00').getTime() : null;
+              const nowMs = Date.now();
+              const todayStr = formatDateKey(today);
+              const taskDateStr = event.task.dueDate ? event.task.dueDate.split('T')[0] : '';
+              const isOverdue = !isCompleted && !!dueTime && dueTime < nowMs;
+              const isTaskToday = !isCompleted && taskDateStr === todayStr;
+
+              const iconBg = isCompleted
+                ? 'bg-emerald-500'
+                : isOverdue
+                  ? 'bg-red-500'
+                  : isTaskToday
+                    ? 'bg-amber-500'
+                    : '';
+              const iconStyle = (!isCompleted && !isOverdue && !isTaskToday)
+                ? { backgroundColor: statusObj?.color ?? '#888' }
+                : undefined;
 
               return (
                 <button
@@ -259,8 +293,8 @@ export function TaskCalendarView({ tasks, onTaskClick }: TaskCalendarViewProps) 
                 >
                   <div className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white shadow-sm',
-                    isCompleted ? 'bg-emerald-500' : ''
-                  )} style={!isCompleted ? { backgroundColor: statusObj?.color ?? '#888' } : undefined}>
+                    iconBg
+                  )} style={iconStyle}>
                     {isCompleted ? (
                       <Check className="w-4 h-4" />
                     ) : (
@@ -273,9 +307,9 @@ export function TaskCalendarView({ tasks, onTaskClick }: TaskCalendarViewProps) 
                       {event.task.title}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-foreground-muted">
-                        Vencimento: Dia todo
-                      </span>
+                      {isOverdue && <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Atrasada</span>}
+                      {isTaskToday && !isOverdue && <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Hoje</span>}
+                      {!isOverdue && !isTaskToday && <span className="text-[11px] text-foreground-muted">Vencimento: Dia todo</span>}
                     </div>
                   </div>
 

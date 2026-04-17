@@ -6,7 +6,7 @@ import { ChevronDown, Pencil, Trash2, CalendarDays, Check, Briefcase, User } fro
 import { PriorityBadge, TaskTypeBadge } from '@/shared/components/ui/Badge';
 import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import { useStore } from '@/shared/lib/store';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/shared/components/ui/DropdownMenu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
 import { DatePicker } from '@/shared/components/ui/DatePicker';
 
 interface TaskListViewProps {
@@ -96,6 +96,7 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
 
               {/* Column labels - Hidden on very small screens, shown as flex otherwise */}
               <div className="hidden md:flex items-center gap-4 text-[10px] font-bold text-foreground-muted uppercase tracking-widest px-2">
+                <div className="w-[130px] shrink-0 text-center">Vínculo</div>
                 <div className="w-[120px] shrink-0 text-center">Responsável</div>
                 <div className="w-[110px] shrink-0 text-center">Previsão</div>
                 <div className="w-[120px] shrink-0 text-center">Etapa</div>
@@ -114,10 +115,7 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                       
                       const dueTime = task.dueDate ? new Date(task.dueDate).getTime() : null;
                       const now = Date.now();
-                      const todayDateStr = new Date().toISOString().split('T')[0];
                       const isOverdue = !!(dueTime && dueTime < now && !isDone);
-                      const isToday = !!(!isOverdue && task.dueDate && task.dueDate.split('T')[0] === todayDateStr && !isDone);
-                      const isDueSoon = !!(dueTime && !isOverdue && !isToday && (dueTime - now) < 48 * 3600000 && !isDone);
 
                       let linkedName = '';
                       let linkedType: 'project' | 'lead' | null = null;
@@ -153,10 +151,24 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                            </button>
                            
                            <div className="flex flex-col min-w-0 flex-1">
-                             {/* Linked Entity (Context) */}
-                             {linkedName && linkedType && (
+                             {/* Title only */}
+                             <span className={cn(
+                               "text-sm font-medium leading-snug",
+                               isDone ? "text-foreground-muted line-through" : "text-foreground",
+                             )}>
+                               {task.title}
+                             </span>
+                           </div>
+                        </div>
+
+                        {/* Flex columns for data */}
+                        <div className="hidden md:flex items-center gap-4 px-2">
+
+                           {/* Vínculo (Projeto ou Lead) */}
+                           <div className="w-[130px] shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                             {linkedName && linkedType ? (
                                <div className={cn(
-                                 'flex items-center gap-1 px-1.5 py-[2px] rounded text-[9px] font-bold w-fit max-w-full mb-0.5',
+                                 'flex items-center gap-1 px-2 py-1 rounded text-[9px] font-bold w-fit max-w-full',
                                  linkedType === 'project'
                                    ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
                                    : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
@@ -165,27 +177,12 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                                    ? <Briefcase className="w-2.5 h-2.5 flex-shrink-0" />
                                    : <User className="w-2.5 h-2.5 flex-shrink-0" />
                                  }
-                                 <span className="truncate uppercase tracking-wider">{linkedName}</span>
+                                 <span className="truncate uppercase tracking-wider max-w-[90px]">{linkedName}</span>
                                </div>
+                             ) : (
+                               <span className="text-[11px] text-foreground-muted/40">—</span>
                              )}
-                             
-                             {/* Title */}
-                             <div className="flex items-center gap-2 flex-wrap">
-                               <span className={cn(
-                                 "text-sm font-medium leading-snug truncate",
-                                 isDone ? "text-foreground-muted line-through" : "text-foreground",
-                               )}>
-                                 {task.title}
-                               </span>
-                               {isOverdue && <span className="bg-destructive/10 text-destructive text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Atrasada</span>}
-                               {isToday && <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Hoje</span>}
-                               {isDueSoon && <span className="bg-warning/10 text-warning text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Em 48h</span>}
-                             </div>
                            </div>
-                        </div>
-
-                        {/* Flex columns for data */}
-                        <div className="hidden md:flex items-center gap-4 px-2">
 
                            {/* Assignee */}
                            <div className="w-[120px] shrink-0 flex items-center justify-center">
