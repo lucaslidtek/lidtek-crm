@@ -36,20 +36,28 @@ export function Dashboard() {
   const blockedTasks = tasks.filter(t => t.status === 'blocked');
 
   // ─── Alertas urgentes ───
+  // Use noon-anchored date to avoid UTC-midnight false positives in -03:00
+  const toLocalNoon = (dateStr: string) => new Date(dateStr.split('T')[0] + 'T12:00:00');
+  const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+
   const overdueFollowUps = leads.filter(l =>
-    l.nextContactDate && new Date(l.nextContactDate) < now &&
+    l.nextContactDate && toLocalNoon(l.nextContactDate) < now &&
     l.stage !== 'lost' && l.stage !== 'contract_signed'
   );
   const overdueTasks = tasks.filter(t =>
-    t.dueDate && new Date(t.dueDate) < now && t.status !== 'done'
+    t.dueDate && toLocalNoon(t.dueDate) < now && t.status !== 'done'
   );
+  const todayTasks = tasks.filter(t =>
+    t.dueDate && t.dueDate.split('T')[0] === todayStr && t.status !== 'done'
+  );
+
+  const totalAlerts = overdueFollowUps.length + overdueTasks.length + todayTasks.length;
+
   const deliveringSoon = activeProjects.filter(p =>
     p.nextDeliveryDate &&
     (new Date(p.nextDeliveryDate).getTime() - Date.now()) < 7 * 86400000 &&
     (new Date(p.nextDeliveryDate).getTime() - Date.now()) > 0
   );
-
-  const totalAlerts = overdueFollowUps.length + overdueTasks.length;
 
   // ─── Minhas tarefas ───
   const myPendingTasks = useMemo(() =>
@@ -57,8 +65,8 @@ export function Dashboard() {
       .filter(t => user?.id && t.ownerIds.includes(user.id) && t.status !== 'done')
       .sort((a, b) => {
         // Overdue first, then by due date
-        const aOver = a.dueDate && new Date(a.dueDate) < now ? -1 : 0;
-        const bOver = b.dueDate && new Date(b.dueDate) < now ? -1 : 0;
+        const aOver = a.dueDate && toLocalNoon(a.dueDate) < now ? -1 : 0;
+        const bOver = b.dueDate && toLocalNoon(b.dueDate) < now ? -1 : 0;
         if (aOver !== bOver) return aOver - bOver;
         if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
@@ -192,6 +200,11 @@ export function Dashboard() {
               {totalAlerts} {totalAlerts > 1 ? 'atenções pendentes' : 'atenção pendente'}
             </p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+              {todayTasks.length > 0 && (
+                <button onClick={() => setLocation('/tasks')} className="text-xs text-warning hover:underline cursor-pointer font-medium">
+                  {todayTasks.length} tarefa{todayTasks.length > 1 ? 's' : ''} para hoje
+                </button>
+              )}
               {overdueFollowUps.length > 0 && (
                 <button onClick={() => setLocation('/crm')} className="text-xs text-destructive hover:underline cursor-pointer">
                   {overdueFollowUps.length} follow-up{overdueFollowUps.length > 1 ? 's' : ''} vencido{overdueFollowUps.length > 1 ? 's' : ''}
@@ -266,7 +279,7 @@ export function Dashboard() {
             {myPendingTasks.length > 0 ? (
               <div className="space-y-1">
                 {myPendingTasks.map(task => {
-                  const isOverdue = task.dueDate && new Date(task.dueDate) < now;
+                  const isOverdue = task.dueDate && toLocalNoon(task.dueDate) < now;
                   const linkedProject = task.projectId ? projects.find(p => p.id === task.projectId) : null;
                   const linkedLead = task.leadId ? leads.find(l => l.id === task.leadId) : null;
 

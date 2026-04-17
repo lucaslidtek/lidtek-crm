@@ -10,6 +10,7 @@ import { ProjectListView } from '@/modules/projects/components/ProjectListView';
 import { ProjectCalendarView } from '@/modules/projects/components/ProjectCalendarView';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
+import { useLocalStorage } from '@/shared/hooks/useLocalStorage';
 import { PROJECT_STAGES } from '@/shared/lib/constants';
 import type { Project, ProjectType, ProjectStatus } from '@/shared/types/models';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/components/ui/DropdownMenu';
@@ -64,13 +65,13 @@ function getProjectSortScore(project: Project): { rank: number; dueTimestamp: nu
 }
 
 export function ProjectsPage() {
-  const [filterType, setFilterType] = useState<FilterType>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [filterType, setFilterType] = useLocalStorage<FilterType>('projects-filterType', 'all');
+  const [statusFilter, setStatusFilter] = useLocalStorage<StatusFilter>('projects-statusFilter', 'all');
   const [search, setSearch] = useState('');
   const { projects, projectsByStage } = useProjects(filterType);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const isMobile = useIsMobile();
-  const [view, setView] = useState<ViewType>(isMobile ? 'list' : 'list');
+  const [view, setView] = useLocalStorage<ViewType>('projects-view', isMobile ? 'list' : 'list');
   const { projects: allProjects } = useStore();
 
   const selectedProject = selectedProjectId ? allProjects.find(p => p.id === selectedProjectId) ?? null : null;

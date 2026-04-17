@@ -20,16 +20,18 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
   const { getUserById, leads, projects, moveTaskStatus } = useStore();
   const owners = (task.ownerIds ?? []).map(id => getUserById(id)).filter(Boolean);
 
-  // Overdue logic
+  // Overdue / today / due-soon logic
   const now = Date.now();
   let safeDateStr = task.dueDate;
   if (safeDateStr) {
     const rawDate = safeDateStr.split('T')[0];
     safeDateStr = rawDate + 'T12:00:00';
   }
+  const todayDateStr = new Date().toISOString().split('T')[0];
   const dueTime = safeDateStr ? new Date(safeDateStr).getTime() : null;
   const isOverdue = dueTime && dueTime < now && task.status !== 'done';
-  const isDueSoon = dueTime && !isOverdue && (dueTime - now) < 48 * 3600000 && task.status !== 'done';
+  const isToday = !isOverdue && task.dueDate && task.dueDate.split('T')[0] === todayDateStr && task.status !== 'done';
+  const isDueSoon = dueTime && !isOverdue && !isToday && (dueTime - now) < 48 * 3600000 && task.status !== 'done';
 
   // Linked entity
   let linkedName = '';
@@ -56,7 +58,10 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
       {isOverdue && (
         <div className="absolute -left-3 -top-3 -bottom-3 w-1 bg-destructive rounded-l-lg" />
       )}
-      {isDueSoon && !isOverdue && (
+      {isToday && (
+        <div className="absolute -left-3 -top-3 -bottom-3 w-1 bg-amber-500 rounded-l-lg" />
+      )}
+      {isDueSoon && !isOverdue && !isToday && (
         <div className="absolute -left-3 -top-3 -bottom-3 w-1 bg-warning rounded-l-lg" />
       )}
       
@@ -115,7 +120,8 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
         <PriorityBadge priority={task.priority} />
         <TaskTypeBadge type={task.type} />
         {isOverdue && <Badge variant="blocked">Atrasada</Badge>}
-        {isDueSoon && !isOverdue && <Badge variant="medium">Em 48h</Badge>}
+        {isToday && !isOverdue && <Badge variant="today">Hoje</Badge>}
+        {isDueSoon && !isOverdue && !isToday && <Badge variant="medium">Em 48h</Badge>}
       </div>
 
       {/* Footer — owners (stacked avatars) + date */}
@@ -156,7 +162,9 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
         {task.dueDate && (
           <div className={cn(
             'flex items-center gap-1 text-[11px] flex-shrink-0',
-            isOverdue ? 'text-destructive font-semibold' : isDueSoon ? 'text-warning font-semibold' : 'text-foreground-muted',
+            isOverdue ? 'text-destructive font-semibold' :
+            isToday ? 'text-amber-500 dark:text-amber-400 font-semibold' :
+            isDueSoon ? 'text-warning font-semibold' : 'text-foreground-muted',
           )}>
             <Calendar className="w-3 h-3" />
             {new Date(safeDateStr as string).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}

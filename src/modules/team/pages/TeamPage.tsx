@@ -36,7 +36,7 @@ function MemberRow({ member, onClick, index }: { member: User; onClick: () => vo
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -10 }}
       transition={{ duration: 0.2, delay: index * 0.03, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors group text-left"
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors group text-left cursor-pointer"
     >
       <div className="relative flex-shrink-0">
         <UserAvatar
@@ -194,13 +194,13 @@ export function TeamPage() {
             <AnimatePresence mode="popLayout">
               {groupedMembers.map((group) => (
                 <div key={group.letter}>
-                  <div className="px-4 py-1.5 flex items-center gap-3">
+                  <div className="px-3 py-1.5 flex items-center gap-3">
                     <span className="text-[11px] font-bold uppercase tracking-widest text-foreground-muted/50 w-4 text-center">
                       {group.letter}
                     </span>
                     <div className="flex-1 h-px bg-border-subtle" />
                   </div>
-                  <div className="divide-y divide-border-subtle/50">
+                  <div className="space-y-0.5 px-2">
                     {group.members.map((member, i) => (
                       <MemberRow
                         key={member.id}

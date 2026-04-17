@@ -9,30 +9,36 @@ import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { useStore } from '@/shared/lib/store';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
+import { useLocalStorage } from '@/shared/hooks/useLocalStorage';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Button } from '@/shared/components/ui/Button';
 import { FloatingActionButton } from '@/shared/components/ui/FloatingActionButton';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
+import { ViewToggle, type ViewType } from '@/shared/components/ui/ViewToggle';
 import { cn } from '@/shared/utils/cn';
 import { TASK_STATUSES } from '@/shared/lib/constants';
 import type { Task, TaskType, TaskPriority } from '@/shared/types/models';
 
+import { TaskListView } from '@/modules/tasks/components/TaskListView';
+import { TaskCalendarView } from '@/modules/tasks/components/TaskCalendarView';
+
 export function TasksKanban() {
-  const [typeFilter, setTypeFilter] = useState<TaskType | 'all'>('all');
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useLocalStorage<TaskType | 'all'>('tasks-typeFilter', 'all');
+  const [priorityFilter, setPriorityFilter] = useLocalStorage<TaskPriority | 'all'>('tasks-priorityFilter', 'all');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
   const { tasks, reorderTasks, deleteTask } = useStore();
   const isMobile = useIsMobile();
+  const [view, setView] = useLocalStorage<ViewType>('tasks-view', isMobile ? 'list' : 'kanban');
 
-  const [ownerFilter, setOwnerFilter] = useState<string | 'all'>('all');
+  const [ownerFilter, setOwnerFilter] = useLocalStorage<string | 'all'>('tasks-ownerFilter', 'all');
 
   const { tasksByStatus, moveTask } = useTasks({ type: typeFilter, priority: priorityFilter, ownerId: ownerFilter });
 
   // Mobile: selected status tab
-  const [mobileStatus, setMobileStatus] = useState<string>('all');
+  const [mobileStatus, setMobileStatus] = useLocalStorage<string>('tasks-mobileStatus', 'all');
 
   const filteredTasksByStatus = useMemo(() => {
     if (!search) return tasksByStatus;
@@ -105,9 +111,18 @@ export function TasksKanban() {
                 />
               )}
               {!isMobile && (
+                <div className="flex items-center gap-2 border-l border-border-subtle pl-2">
+                  <ViewToggle view={view} onChange={setView} />
+                  <Button onClick={() => setCreateOpen(true)} size="sm">
+                    <Plus className="w-4 h-4" />
+                    Nova Tarefa
+                  </Button>
+                </div>
+              )}
+              {isMobile && (
                 <Button onClick={() => setCreateOpen(true)} size="sm">
                   <Plus className="w-4 h-4" />
-                  Nova Tarefa
+                  Nova
                 </Button>
               )}
             </>
@@ -159,8 +174,9 @@ export function TasksKanban() {
 
       {/* Content */}
       <div className={cn(
-        'flex-1 min-h-0 overflow-hidden',
-        !isMobile && 'rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40',
+        'flex-1 min-w-0 h-full',
+        !isMobile && view === 'kanban' && 'rounded-xl bg-zinc-50/50 dark:bg-zinc-800/20 border border-zinc-200/60 dark:border-zinc-700/40 overflow-hidden',
+        !isMobile && view !== 'kanban' && 'overflow-y-hidden' // Let internal views scroll
       )}>
         {isMobile ? (
           /* ── Mobile: card list filtered by status ── */
@@ -186,6 +202,17 @@ export function TasksKanban() {
               </div>
             )}
           </div>
+        ) : view === 'list' ? (
+          <TaskListView 
+            tasks={allFilteredTasks} 
+            onEditTask={setEditingTask}
+            onDeleteTask={setDeletingTask}
+          />
+        ) : view === 'calendar' ? (
+          <TaskCalendarView 
+            tasks={allFilteredTasks} 
+            onTaskClick={setEditingTask}
+          />
         ) : (
           <KanbanBoard<Task>
             columns={TASK_STATUSES}

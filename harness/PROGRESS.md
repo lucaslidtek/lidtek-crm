@@ -6,8 +6,8 @@
 
 ## Estado Atual do Projeto
 
-**Última atualização:** 2026-04-16 17:45 (BRT)
-**Sprint ativo:** T-AD-03 (Realtime — Sprints/Projects/Tasks em tempo real)
+**Última atualização:** 2026-04-17 (BRT)
+**Sprint ativo:** T-AD-09 (Persistência de Visões e Filtros)
 **Status geral:** ✅ PASSOU
 
 ### Saúde do Projeto
@@ -157,6 +157,8 @@ Na sessão de 2026-04-13 (noite), o app recebeu otimização de performance comp
 
 | Data | Agente | O que foi feito | Commit |
 |------|--------|-----------------|--------|
+| 2026-04-17 | Implementador | Hotfix T-AD-09: Páginas principais (CRM, Projects, Tasks) - Visões e filtros não persistiam. Implementado hook `useLocalStorage` para hidratar states de `view`, seleções e abas. type-check ok. | pendente |
+| 2026-04-17 | Implementador | Hotfix T-AD-06: Dashboard — datas YYYY-MM-DD interpretadas como UTC midnight causavam false positive de "tarefa atrasada". Fix: `toLocalNoon()` ancora ao meio-dia local. type-check: 0 erros novos. | pendente |
 | 2026-04-17 | Implementador | Hotfix T-AD-05: Reescrita do AuthProvider — removido migration code que apagava sessão, corrigida race condition resolveLoading() vs setUser(), mudança flowType implicit→pkce, AuthProvider agora usa INITIAL_SESSION como única fonte de verdade | pendente |
 | 2026-04-16 | Implementador | Hotfix T-AD-04 (pt2): removida FK `tasks_owner_id_fkey`, `leads_owner_id_fkey`, `projects_owner_id_fkey` (campos legados); corrigidos owner_ids corrompidos em tasks (3) e projects (3) via array_replace | pendente |
 | 2026-04-16 | Implementador | Hotfix T-AD-04: corrigida policy RLS `tasks_update` — USING agora usa `is_member()`, WITH CHECK garante que admins/gestores editam qualquer task independente de `owner_id` legado | pendente |

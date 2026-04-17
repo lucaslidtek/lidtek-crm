@@ -8,7 +8,7 @@ interface DatePickerProps {
   onChange: (date: string | undefined) => void;
   placeholder?: string;
   disabled?: boolean;
-  variant?: 'default' | 'compact' | 'badge-overdue' | 'badge-upcoming' | 'field';
+  variant?: 'default' | 'compact' | 'badge-overdue' | 'badge-today' | 'badge-upcoming' | 'field';
   label?: string;
   className?: string;
 }
@@ -141,13 +141,26 @@ export function DatePicker({
 
   // Format display
   const displayText = parsedDate
-    ? variant === 'field'
-      ? parsedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-      : parsedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    ? variant === 'badge-today'
+      ? 'HOJE'
+      : variant === 'field'
+        ? parsedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : variant === 'default'
+          ? parsedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+          : parsedDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '')
     : placeholder;
 
   // Variant styles for trigger
-  const isOverdue = parsedDate && parsedDate < today;
+  const toLocalNoon = (d: Date) => {
+    const str = d.toISOString().split('T')[0];
+    return new Date(str + 'T12:00:00');
+  };
+  const todayNoon = toLocalNoon(today);
+  const parsedNoon = parsedDate ? toLocalNoon(parsedDate) : null;
+  const todayStr = today.toISOString().split('T')[0];
+  const valueStr = value ? value.split('T')[0] : null;
+  const isOverdue = parsedNoon && parsedNoon < todayNoon;
+  const isDateToday = valueStr === todayStr;
   const triggerStyles = cn(
     'flex items-center gap-1.5 cursor-pointer transition-all rounded-md text-[10px] font-medium group/date relative',
     variant === 'compact' && 'px-2 py-1',
@@ -160,8 +173,10 @@ export function DatePicker({
     ],
     (variant === 'badge-overdue' || (variant === 'default' && isOverdue && parsedDate)) &&
       'text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 px-2 h-[22px] py-0 text-[9px] uppercase tracking-wider',
-    (variant === 'badge-upcoming' || (variant === 'default' && parsedDate && !isOverdue)) &&
-      'text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 px-2 h-[22px] py-0 text-[9px] uppercase tracking-wider',
+    variant === 'badge-today' &&
+      'text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/40 px-2 h-[22px] py-0 text-[9px] uppercase tracking-wider',
+    (variant === 'badge-upcoming' || (variant === 'default' && parsedDate && !isOverdue && !isDateToday)) &&
+      'text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-2 h-[22px] py-0 text-[9px] uppercase tracking-wider',
     !parsedDate && variant !== 'compact' && variant !== 'field' &&
       'border border-dashed border-zinc-300 dark:border-zinc-600 text-foreground-muted/60 hover:text-foreground-muted hover:border-primary/40 hover:bg-primary/5',
     !parsedDate && variant === 'compact' &&
@@ -169,6 +184,8 @@ export function DatePicker({
     disabled && 'opacity-50 cursor-default',
     className,
   );
+
+
 
   return (
     <>

@@ -358,6 +358,19 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
   const currentPriority = sprint.priority ?? 'medium';
   const priorityCfg = PRIORITY_CONFIG[currentPriority];
   const PriorityIcon = priorityCfg.icon;
+
+  // Due date urgency — timezone-safe (anchored to local noon)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const dueDateStr = sprint.dueDate ? sprint.dueDate.split('T')[0] : null;
+  const dueDateNoon = dueDateStr ? new Date(dueDateStr + 'T12:00:00') : null;
+  const nowNoon = new Date(todayStr + 'T12:00:00');
+  const dueDateVariant: 'compact' | 'badge-today' | 'badge-overdue' | 'badge-upcoming' = !dueDateStr
+    ? 'compact'
+    : dueDateStr === todayStr
+      ? 'badge-today'
+      : dueDateNoon! < nowNoon
+        ? 'badge-overdue'
+        : 'badge-upcoming';
   const [completing, setCompleting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(sprint.name);
@@ -667,7 +680,7 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
                     value={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : undefined}
                     onChange={handleDateChange}
                     disabled={isCompleted}
-                    variant={sprint.dueDate && new Date(sprint.dueDate) < new Date() ? 'badge-overdue' : sprint.dueDate ? 'badge-upcoming' : 'compact'}
+                    variant={dueDateVariant}
                     placeholder="+ Prazo"
                   />
                 )}
@@ -821,7 +834,7 @@ function SprintRow({ sprint, isActive, onComplete, onUpdate, onDelete, isMobile,
                   value={sprint.dueDate ? new Date(sprint.dueDate).toISOString().slice(0, 10) : undefined}
                   onChange={handleDateChange}
                   disabled={isCompleted}
-                  variant={sprint.dueDate && new Date(sprint.dueDate) < new Date() ? 'badge-overdue' : sprint.dueDate ? 'badge-upcoming' : 'compact'}
+                  variant={dueDateVariant}
                   placeholder="+ Prazo"
                 />
               )}

@@ -598,25 +598,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshAll, projects, tasks]);
 
   const createTask = useCallback(async (data: Parameters<typeof api.tasks.create>[0]) => {
-    // 15s timeout — prevents the dialog from hanging forever on FK violations or DB issues
-    const task = await Promise.race([
-      api.tasks.create(data),
-      new Promise<Task>((_, reject) =>
-        setTimeout(() => reject(new Error('A criação da tarefa demorou muito (Timeout). Verifique sua conexão ou tente novamente.')), 15000)
-      )
-    ]);
+    const task = await api.tasks.create(data);
     await refreshTasks();
     return task;
   }, [refreshTasks]);
 
   const updateTask = useCallback(async (id: string, data: Partial<Task>) => {
     try {
-      const task = await Promise.race([
-        api.tasks.update(id, data),
-        new Promise<Task>((_, reject) => 
-          setTimeout(() => reject(new Error('A requisição para o banco de dados demorou muito tempo (Timeout). A conexão com a internet caiu ou há um bloqueio SQL.')), 10000)
-        )
-      ]);
+      // Optimistic update — instant UI feedback before server confirms
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
+
+      const task = await api.tasks.update(id, data);
 
       // Sync linked sprint if it exists
       if (task.sprintId) {
@@ -626,6 +618,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (data.priority !== undefined) sprintUpdates.priority = data.priority as any;
 
         if (Object.keys(sprintUpdates).length > 0) {
+          // Optimistic update for sprint too
+          setProjects(prev => prev.map(p => ({
+            ...p,
+            sprints: p.sprints.map(s => s.id === task.sprintId ? { ...s, ...sprintUpdates } : s),
+          })));
           try {
             await api.sprints.update(task.sprintId, sprintUpdates);
             await refreshProjects();
@@ -746,12 +743,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshProjects, refreshTasks, projects, users]);
 
   const updateSprint = useCallback(async (sprintId: string, data: Partial<Sprint>) => {
-    await api.sprints.update(sprintId, data);
-    // Bidirectional sync: if metadata changed, sync the linked task
+    // ── Step 1: Optimistic update (instant, no waiting) ──
+    setProjects(prev => prev.map(p => ({
+      ...p,
+      sprints: p.sprints.map(s => s.id === sprintId ? { ...s, ...data } : s),
+    })));
+
+    // ── Step 2: Find linked task for bidirectional sync ──
+    // Read tasks from the functional updater to avoid stale closure
     const linkedTask = tasks.find(t => t.sprintId === sprintId);
+    const taskUpdates: Partial<Task> = {};
+
     if (linkedTask) {
-      const taskUpdates: Partial<Task> = {};
-      
       if (data.status) {
         const taskStatusMap: Record<string, TaskStatus> = {
           'active': 'in_progress',
@@ -762,20 +765,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           taskUpdates.status = newTaskStatus;
         }
       }
-
       if (data.name !== undefined) taskUpdates.title = data.name;
       if (data.dueDate !== undefined) taskUpdates.dueDate = data.dueDate;
       if (data.priority !== undefined) taskUpdates.priority = data.priority as any;
 
+      // Optimistic update for the linked task immediately
       if (Object.keys(taskUpdates).length > 0) {
-        try {
-           await api.tasks.update(linkedTask.id, taskUpdates);
-        } catch(e) {
-           console.warn('[Store] Bidirectional sync back to Task failed', e);
-        }
+        setTasks(prev => prev.map(t => t.id === linkedTask.id ? { ...t, ...taskUpdates } : t));
       }
     }
-    await Promise.all([refreshProjects(), refreshTasks()]);
+
+    // ── Step 3: Persist to DB (after optimistic update shown) ──
+    try {
+      await api.sprints.update(sprintId, data);
+
+      if (linkedTask && Object.keys(taskUpdates).length > 0) {
+        try {
+          await api.tasks.update(linkedTask.id, taskUpdates);
+        } catch(e) {
+          console.warn('[Store] Bidirectional sync back to Task failed', e);
+        }
+      }
+      // Supabase Realtime already monitors 'sprints' table (debounced 600ms)
+      // and will call refreshProjects automatically when DB confirms the write.
+      // We only need to refresh tasks here for the bidirectional sync.
+      // Wait 800ms so DB write has propagated before we re-fetch.
+      await new Promise(res => setTimeout(res, 800));
+      await refreshTasks();
+    } catch (err) {
+      // Revert optimistic updates on failure
+      console.error('[Store] updateSprint failed — reverting optimistic update:', err);
+      await Promise.all([refreshProjects(), refreshTasks()]);
+      throw err;
+    }
   }, [refreshProjects, refreshTasks, tasks]);
 
   const completeSprint = useCallback(async (sprintId: string) => {

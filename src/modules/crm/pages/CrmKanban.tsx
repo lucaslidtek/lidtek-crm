@@ -9,6 +9,7 @@ import { ColumnManagerDialog } from '@/modules/crm/components/ColumnManagerDialo
 import { useLeads } from '@/modules/crm/hooks/useLeads';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import { useIsMobile } from '@/shared/hooks/useIsMobile';
+import { useLocalStorage } from '@/shared/hooks/useLocalStorage';
 import { Button } from '@/shared/components/ui/Button';
 import { ViewToggle, type ViewType } from '@/shared/components/ui/ViewToggle';
 import { LeadListView } from '@/modules/crm/components/LeadListView';
@@ -25,11 +26,11 @@ export function CrmKanban() {
 
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [view, setView] = useState<ViewType>('kanban');
+  const [view, setView] = useLocalStorage<ViewType>('crm-view', 'kanban');
   const [search, setSearch] = useState('');
 
   // Mobile: selected stage tab
-  const [mobileStage, setMobileStage] = useState<string>('all');
+  const [mobileStage, setMobileStage] = useLocalStorage<string>('crm-mobileStage', 'all');
 
   // Column manager state
   const [columnDialogOpen, setColumnDialogOpen] = useState(false);

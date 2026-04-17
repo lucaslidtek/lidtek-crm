@@ -10,7 +10,9 @@ type BadgeVariant =
   // Task type
   | 'project' | 'sales' | 'standalone'
   // Project type
-  | 'recurring' | 'oneshot';
+  | 'recurring' | 'oneshot'
+  // Urgency
+  | 'today';
 
 interface BadgeProps {
   variant?: BadgeVariant;
@@ -38,6 +40,8 @@ const variantStyles: Record<BadgeVariant, string> = {
   // Project type
   recurring: 'bg-success/15 text-success',
   oneshot: 'bg-blue-light/15 text-blue-light',
+  // Urgency
+  today: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
 };
 
 const dotColors: Partial<Record<BadgeVariant, string>> = {

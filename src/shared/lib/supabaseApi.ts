@@ -85,6 +85,13 @@ function rowToLead(row: any, taskIds: string[] = []): Lead {
   };
 }
 
+// Normalize Postgres date strings ("2026-04-17 00:00:00+00" or ISO) to "YYYY-MM-DD"
+function toDateStr(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  // Works for both Postgres format (space separator) and ISO format (T separator)
+  return raw.replace('T', ' ').split(' ')[0];
+}
+
 function rowToSprint(row: any): Sprint {
   return {
     id: row.id,
@@ -92,9 +99,9 @@ function rowToSprint(row: any): Sprint {
     name: row.name,
     stage: row.stage,
     priority: row.priority ?? 'medium',
-    startDate: row.start_date,
-    dueDate: row.due_date ?? undefined,
-    endDate: row.end_date ?? undefined,
+    startDate: toDateStr(row.start_date) ?? '',
+    dueDate: toDateStr(row.due_date),
+    endDate: toDateStr(row.end_date),
     status: row.status,
     taskIds: [], // Will be populated below
   };
@@ -137,7 +144,7 @@ function rowToTask(row: any): Task {
     status: row.status,
     priority: row.priority,
     ownerIds,
-    dueDate: row.due_date ?? undefined,
+    dueDate: toDateStr(row.due_date),
     tags: row.tags ?? [],
     projectId: row.project_id ?? undefined,
     sprintId: row.sprint_id ?? undefined,

@@ -15,6 +15,58 @@
 
 ### Tarefas Ad-Hoc
 
+#### T-AD-09: Feature — Persistência de Filtros e Visões
+**Tipo:** Ad-hoc — solicitada em 2026-04-17
+**Descrição:** Quando mudávamos filtros e visualizações nas páginas Kanban (CRM, Tasks, Projects) e trocávamos de página, o estado voltava ao padrão por ser mantido apenas em \`useState\`. Criado o hook \`useLocalStorage\` (uma camada reactiva sobre localStorage) e aplicado nas páginas para manter \`view\`, filtros e estágios do grid/list.
+**Critérios de aceite:**
+- [x] O usuário volta para a tela de CRM, Projetos ou Tarefas e mantém: filtros ativados, abas, e o tipo de visualização.
+- [x] Sincronização multi-aba nativa baseada no StorageEvent dentro do novo hook \`useLocalStorage\`
+**Arquivos modificados:** \`src/shared/hooks/useLocalStorage.ts\`, \`src/modules/tasks/pages/TasksKanban.tsx\`, \`src/modules/projects/pages/ProjectsPage.tsx\`, \`src/modules/crm/pages/CrmKanban.tsx\`
+**Sensores rodados:** [x] type-check (0 erros novos)
+**Status:** ✅ Concluído
+
+---
+
+#### T-AD-08: Feature — SprintRow mostra badge "Hoje" / "Atrasada" no DatePicker da sprint
+**Tipo:** Ad-hoc — solicitada em 2026-04-17 11:05
+**Descrição:** O `DatePicker` no `SprintRow` usa `new Date(sprint.dueDate) < new Date()` para escolher o variant, com o mesmo bug de timezone. Além disso, não existe variant "hoje". Corrigir usando `toLocalNoon()` e adicionar variant `badge-today` no DatePicker.
+**Critérios de aceite:**
+- [x] Sprint com dueDate = hoje mostra badge de cor âmbar ("Hoje" ou similar)
+- [x] Sprint com dueDate passado mostra badge vermelho ("Atrasada")
+- [x] Fix de timezone aplicado em ambos os renders (desktop e mobile)
+**Arquivos modificados:** `src/modules/projects/components/ProjectListView.tsx`
+**Sensores rodados:** [ ] type-check
+**Status:** ✅ Concluído
+
+---
+
+#### T-AD-07: Feature — Tarefas do dia destacadas no Dashboard e TaskCard
+**Tipo:** Ad-hoc — solicitada em 2026-04-17 11:01
+**Descrição:** Tarefas com `dueDate` = hoje devem ter tratamento visual próprio. No Dashboard, aparecem no banner como "N tarefa(s) para hoje". No TaskCard, exibem badge "Hoje" com barra lateral âmbar.
+**Critérios de aceite:**
+- [x] Dashboard: banner mostra "N tarefa(s) para hoje" separado das atrasadas
+- [x] TaskCard: badge "Hoje" com cor âmbar, barra lateral âmbar
+- [x] Date label no footer âmbar quando for hoje
+**Arquivos modificados:** `src/modules/dashboard/pages/Dashboard.tsx`, `src/modules/tasks/components/TaskCard.tsx`
+**Sensores rodados:** [ ] type-check [ ] lint
+**Status:** ✅ Concluído
+
+---
+
+#### T-AD-06: Hotfix — Dashboard mostra "1 tarefa atrasada" incorretamente (timezone offset)
+**Tipo:** Ad-hoc — solicitada em 2026-04-17 10:54
+**Descrição:** O filtro `overdueTasks` compara `new Date(t.dueDate) < now` onde `t.dueDate = '2026-04-17'` é interpretado como `2026-04-17T00:00:00Z` = `2026-04-16T21:00:00-03:00`, ficando no passado durante o dia 17/04. A tarefa "Inscrição Feira Hospitalar" com dueDate 17/04 aparece como atrasada apesar de estar no prazo. O mesmo padrão de fix de timezone (`split('T')[0] + 'T12:00:00'`) já usado na *exibição* da data deve ser aplicado na *comparação*.
+**Root Cause:** Datas `YYYY-MM-DD` do banco são interpretadas como UTC midnight, que no fuso -03:00 corresponde ao dia anterior. A comparação `< now` resulta em falso positivo quando a data de vencimento é o dia atual.
+**Critérios de aceite:**
+- [x] Tarefas com dueDate igual ao dia atual **não** aparecem como atrasadas no banner do Dashboard
+- [x] Tarefas com dueDate do dia anterior ou anterior ainda aparecem como atrasadas
+- [x] O banner "atenção pendente" some quando não há tarefas genuinamente atrasadas
+**Arquivos modificados:** `src/modules/dashboard/pages/Dashboard.tsx`
+**Sensores rodados:** [ ] type-check [ ] lint
+**Status:** ✅ Concluído
+
+---
+
 #### T-AD-05: Hotfix — Login Google redireciona de volta para tela de login (race condition + migration wipe)
 **Tipo:** Ad-hoc — solicitada em 2026-04-17 09:28
 **Descrição:** Após login com Google, o usuário é redirecionado de volta para `/login` ao invés de entrar no sistema. Root causes identificados: (1) O bloco de migração (`AUTH_MIGRATION_KEY`) apaga o `AUTH_STORAGE_KEY` a cada chamada inicial, zerando o cache de sessão — isso faz o `isLoading` iniciar como `true`; (2) Após o redirect OAuth, `resolveLoading()` é chamado antes do `setUser()` atualizar o estado React, causando um frame em que `isLoading=false` + `isAuthenticated=false` → `PrivateRoute` redireciona para `/login`; (3) O `flowType: 'implicit'` foi declarado mas o redirect URI não estava configurado para o hash fragment.
