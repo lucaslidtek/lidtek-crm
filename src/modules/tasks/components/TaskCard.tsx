@@ -54,7 +54,7 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
     <div className={cn(
       'space-y-2 group/task relative',
     )}>
-      {/* Absolute edge indicator spanning the container's p-3 bounding box */}
+      {/* Edge indicator — clipped by overflow-hidden on KanbanCard, so it won't bleed between cards */}
       {isOverdue && (
         <div className="absolute -left-3 -top-3 -bottom-3 w-1 bg-destructive rounded-l-lg" />
       )}

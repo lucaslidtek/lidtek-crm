@@ -46,7 +46,7 @@ export function KanbanCard({ id, children, onClick }: KanbanCardProps) {
       {...listeners}
       onClick={onClick}
       className={cn(
-        'glass rounded-lg p-3',
+        'glass rounded-lg p-3 overflow-hidden',
         'cursor-grab active:cursor-grabbing',
         'transition-shadow duration-200',
         'hover:shadow-md hover:bg-black/[0.03] dark:hover:bg-white/[0.03]',
