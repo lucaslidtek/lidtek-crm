@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Task } from '@/shared/types/models';
 import { TASK_STATUSES } from '@/shared/lib/constants';
 import { cn } from '@/shared/utils/cn';
-import { ChevronDown, Pencil, Trash2, CalendarDays, Check } from 'lucide-react';
+import { ChevronDown, Pencil, Trash2, CalendarDays, Check, Briefcase, User } from 'lucide-react';
 import { PriorityBadge, TaskTypeBadge } from '@/shared/components/ui/Badge';
 import { UserAvatar } from '@/shared/components/ui/UserAvatar';
 import { useStore } from '@/shared/lib/store';
@@ -17,7 +17,7 @@ interface TaskListViewProps {
 
 export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const { users, getUserById, updateTask } = useStore();
+  const { users, getUserById, updateTask, projects, leads } = useStore();
 
   const toggleGroup = (statusId: string) => {
     setCollapsedGroups(prev => {
@@ -109,9 +109,27 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
               <div className="flex flex-col">
                 {groupTasks.length > 0 ? (
                   groupTasks.map(task => {
-                    const owners = (task.ownerIds ?? []).map(id => getUserById(id)).filter(Boolean);
-                    const isDone = task.status === 'done';
-                    const hasPassedDueDate = task.dueDate && new Date(task.dueDate).getTime() < Date.now() && !isDone;
+                      const owners = (task.ownerIds ?? []).map(id => getUserById(id)).filter(Boolean);
+                      const isDone = task.status === 'done';
+                      
+                      const dueTime = task.dueDate ? new Date(task.dueDate).getTime() : null;
+                      const now = Date.now();
+                      const todayDateStr = new Date().toISOString().split('T')[0];
+                      const isOverdue = !!(dueTime && dueTime < now && !isDone);
+                      const isToday = !!(!isOverdue && task.dueDate && task.dueDate.split('T')[0] === todayDateStr && !isDone);
+                      const isDueSoon = !!(dueTime && !isOverdue && !isToday && (dueTime - now) < 48 * 3600000 && !isDone);
+
+                      let linkedName = '';
+                      let linkedType: 'project' | 'lead' | null = null;
+                      if (task.projectId) {
+                        const project = projects?.find(p => p.id === task.projectId);
+                        linkedName = project?.clientName ?? '';
+                        linkedType = 'project';
+                      } else if (task.leadId) {
+                        const lead = leads?.find(l => l.id === task.leadId);
+                        linkedName = lead?.name ?? '';
+                        linkedType = 'lead';
+                      }
 
                     return (
                       <div 
@@ -120,12 +138,12 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                         className="group relative flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-4 w-full py-2.5 px-2 md:px-0 border-b border-border-subtle/50 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02] cursor-pointer"
                       >
                         {/* Title column */}
-                        <div className="flex items-center gap-3 flex-1 min-w-0 md:pl-8">
+                        <div className="flex items-start md:items-center gap-3 flex-1 min-w-0 md:pl-8 py-0.5">
                            {/* Status toggle square */}
                            <button 
                              onClick={(e) => toggleTaskCompletion(task, e)}
                              className={cn(
-                               "w-[14px] h-[14px] rounded-[3px] flex items-center justify-center transition-all flex-shrink-0 cursor-pointer shadow-sm hover:scale-110 border border-black/10 dark:border-white/10",
+                               "w-[14px] h-[14px] rounded-[3px] flex items-center justify-center transition-all flex-shrink-0 cursor-pointer shadow-sm hover:scale-110 border border-black/10 dark:border-white/10 mt-[3px] md:mt-0",
                                isDone ? "bg-emerald-500" : ""
                              )}
                              style={!isDone ? { backgroundColor: status.color } : undefined}
@@ -134,14 +152,36 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                              {isDone && <Check className="w-[10px] h-[10px] text-white" strokeWidth={3} />}
                            </button>
                            
-                           {/* Title */}
-                           <span className={cn(
-                             "text-sm font-medium leading-snug truncate",
-                             isDone ? "text-foreground-muted line-through" : "text-foreground",
-                             hasPassedDueDate && "text-red-600 dark:text-red-400 font-semibold"
-                           )}>
-                             {task.title}
-                           </span>
+                           <div className="flex flex-col min-w-0 flex-1">
+                             {/* Linked Entity (Context) */}
+                             {linkedName && linkedType && (
+                               <div className={cn(
+                                 'flex items-center gap-1 px-1.5 py-[2px] rounded text-[9px] font-bold w-fit max-w-full mb-0.5',
+                                 linkedType === 'project'
+                                   ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+                                   : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
+                               )}>
+                                 {linkedType === 'project'
+                                   ? <Briefcase className="w-2.5 h-2.5 flex-shrink-0" />
+                                   : <User className="w-2.5 h-2.5 flex-shrink-0" />
+                                 }
+                                 <span className="truncate uppercase tracking-wider">{linkedName}</span>
+                               </div>
+                             )}
+                             
+                             {/* Title */}
+                             <div className="flex items-center gap-2 flex-wrap">
+                               <span className={cn(
+                                 "text-sm font-medium leading-snug truncate",
+                                 isDone ? "text-foreground-muted line-through" : "text-foreground",
+                               )}>
+                                 {task.title}
+                               </span>
+                               {isOverdue && <span className="bg-destructive/10 text-destructive text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Atrasada</span>}
+                               {isToday && <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Hoje</span>}
+                               {isDueSoon && <span className="bg-warning/10 text-warning text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Em 48h</span>}
+                             </div>
+                           </div>
                         </div>
 
                         {/* Flex columns for data */}
@@ -215,7 +255,7 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                                onChange={(val) => updateTask(task.id, { dueDate: val })}
                                placeholder="Não def."
                                variant={
-                                 hasPassedDueDate 
+                                 isOverdue 
                                    ? 'badge-overdue' 
                                    : task.dueDate && new Date(task.dueDate).getTime() < Date.now() + 86400000 && new Date(task.dueDate).getTime() > Date.now() 
                                      ? 'badge-today' 
@@ -295,7 +335,7 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                         <div className="flex md:hidden w-full items-center justify-between text-xs text-foreground-muted mt-1 px-1">
                           <div className="flex items-center gap-2">
                              {task.dueDate && (
-                               <div className={cn("flex items-center gap-1", hasPassedDueDate && "text-red-500")}>
+                               <div className={cn("flex items-center gap-1", isOverdue && "text-red-500")}>
                                  <CalendarDays className="w-3 h-3" />
                                  {new Date(task.dueDate).toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' })}
                                </div>
