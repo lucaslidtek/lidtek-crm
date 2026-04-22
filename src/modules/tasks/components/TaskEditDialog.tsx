@@ -45,6 +45,9 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
       setLeadId(task.leadId ?? '');
       setError(null);
       setShowDeleteConfirm(false);
+      // CRITICAL: always reset loading when task changes (Realtime may re-trigger
+      // this effect while a save is in flight, leaving loading stuck at true)
+      setLoading(false);
     }
   }, [task]);
 
@@ -55,16 +58,21 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
     setLoading(true);
     setError(null);
     try {
-      await updateTask(task.id, {
-        title: title.trim(),
-        description: description.trim() || (null as any),
-        type,
-        priority,
-        ownerIds,
-        dueDate: dueDate || (null as any),
-        projectId: type === 'project' && projectId ? projectId : (null as any),
-        leadId: type === 'sales' && leadId ? leadId : (null as any),
-      });
+      await Promise.race([
+        updateTask(task.id, {
+          title: title.trim(),
+          description: description.trim() || (null as any),
+          type,
+          priority,
+          ownerIds,
+          dueDate: dueDate || (null as any),
+          projectId: type === 'project' && projectId ? projectId : (null as any),
+          leadId: type === 'sales' && leadId ? leadId : (null as any),
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('A atualização demorou muito (Timeout). Verifique sua conexão e tente novamente.')), 10000)
+        ),
+      ]);
       onOpenChange(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao atualizar tarefa';

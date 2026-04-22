@@ -157,6 +157,7 @@ Na sessão de 2026-04-13 (noite), o app recebeu otimização de performance comp
 
 | Data | Agente | O que foi feito | Commit |
 |------|--------|-----------------|--------|
+| 2026-04-22 | Implementador | Hotfix T-AD-10: TaskEditDialog travava em "Salvando..." — race condition com Realtime. Fix: `setLoading(false)` adicionado no `useEffect` de reset do form; `Promise.race` + timeout 10s no `updateTask` do store e no dialog. type-check: 0 erros novos. | pendente |
 | 2026-04-17 | Implementador | Hotfix T-AD-09: Páginas principais (CRM, Projects, Tasks) - Visões e filtros não persistiam. Implementado hook `useLocalStorage` para hidratar states de `view`, seleções e abas. type-check ok. | pendente |
 | 2026-04-17 | Implementador | Hotfix T-AD-06: Dashboard — datas YYYY-MM-DD interpretadas como UTC midnight causavam false positive de "tarefa atrasada". Fix: `toLocalNoon()` ancora ao meio-dia local. type-check: 0 erros novos. | pendente |
 | 2026-04-17 | Implementador | Hotfix T-AD-05: Reescrita do AuthProvider — removido migration code que apagava sessão, corrigida race condition resolveLoading() vs setUser(), mudança flowType implicit→pkce, AuthProvider agora usa INITIAL_SESSION como única fonte de verdade | pendente |

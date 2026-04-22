@@ -15,6 +15,20 @@
 
 ### Tarefas Ad-Hoc
 
+#### T-AD-10: Hotfix — TaskEditDialog fica travado em "Salvando..." (Realtime race condition)
+**Tipo:** Ad-hoc — solicitada em 2026-04-22
+**Descrição:** Ao salvar uma tarefa, o botão fica eternamente em "Salvando..." e o modal não fecha. Os dados são salvos no banco, mas o estado `loading` fica preso em `true`. Root cause: o Realtime subscription dispara `scheduleTasksRefresh()` ~600ms após o UPDATE no banco. Isso chama `setTasks()` no store, causando re-render do componente pai que passa um novo objeto `task` (nova referência) ao `TaskEditDialog`. O `useEffect` do dialog detecta a mudança e executa, resetando o form — **porém sem chamar `setLoading(false)`**. Se isso acontecer enquanto o `await updateTask()` ainda está pendente (esperando `refreshTasks()`), o estado de loading fica dessincronizado. Além disso, não há timeout de segurança no `updateTask` do store — se a promise travar, o dialog fica preso para sempre.
+**Critérios de aceite:**
+- [ ] Modal fecha normalmente após salvar uma tarefa
+- [ ] Botão "Salvando..." não fica preso após re-abrir o dialog
+- [ ] Se updateTask demorar mais de 10s, o usuário recebe mensagem de erro (timeout)
+- [ ] Dados continuam sendo salvos corretamente
+**Arquivos modificados:** `src/modules/tasks/components/TaskEditDialog.tsx`, `src/shared/lib/store.tsx`
+**Sensores rodados:** [x] type-check (0 erros novos, erros pré-existentes documentados) [ ] lint
+**Status:** ✅ Concluído
+
+---
+
 #### T-AD-09: Feature — Persistência de Filtros e Visões
 **Tipo:** Ad-hoc — solicitada em 2026-04-17
 **Descrição:** Quando mudávamos filtros e visualizações nas páginas Kanban (CRM, Tasks, Projects) e trocávamos de página, o estado voltava ao padrão por ser mantido apenas em \`useState\`. Criado o hook \`useLocalStorage\` (uma camada reactiva sobre localStorage) e aplicado nas páginas para manter \`view\`, filtros e estágios do grid/list.

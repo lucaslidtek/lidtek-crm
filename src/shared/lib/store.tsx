@@ -608,7 +608,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Optimistic update — instant UI feedback before server confirms
       setTasks(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
 
-      const task = await api.tasks.update(id, data);
+      // 10s timeout — prevents dialog hanging if RLS silently blocks the SELECT
+      // after a successful UPDATE (same pattern as createLead / createTask)
+      const task = await Promise.race([
+        api.tasks.update(id, data),
+        new Promise<Task>((_, reject) =>
+          setTimeout(() => reject(new Error('A atualização da tarefa demorou muito (Timeout). Os dados podem ter sido salvos — verifique sua conexão e tente novamente.')), 10000)
+        ),
+      ]);
 
       // Sync linked sprint if it exists
       if (task.sprintId) {
