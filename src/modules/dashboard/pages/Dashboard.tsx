@@ -38,6 +38,8 @@ export function Dashboard() {
   // ─── Alertas urgentes ───
   // Use noon-anchored date to avoid UTC-midnight false positives in -03:00
   const toLocalNoon = (dateStr: string) => new Date(dateStr.split('T')[0] + 'T12:00:00');
+  // Use end-of-day anchor for "overdue" checks: a task due TODAY is only overdue after 23:59:59
+  const toEndOfDay = (dateStr: string) => new Date(dateStr.split('T')[0] + 'T23:59:59');
   const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
   const overdueFollowUps = leads.filter(l =>
@@ -45,7 +47,7 @@ export function Dashboard() {
     l.stage !== 'lost' && l.stage !== 'contract_signed'
   );
   const overdueTasks = tasks.filter(t =>
-    t.dueDate && toLocalNoon(t.dueDate) < now && t.status !== 'done'
+    t.dueDate && toEndOfDay(t.dueDate) < now && t.status !== 'done'
   );
   const todayTasks = tasks.filter(t =>
     t.dueDate && t.dueDate.split('T')[0] === todayStr && t.status !== 'done'
@@ -65,8 +67,8 @@ export function Dashboard() {
       .filter(t => user?.id && t.ownerIds.includes(user.id) && t.status !== 'done')
       .sort((a, b) => {
         // Overdue first, then by due date
-        const aOver = a.dueDate && toLocalNoon(a.dueDate) < now ? -1 : 0;
-        const bOver = b.dueDate && toLocalNoon(b.dueDate) < now ? -1 : 0;
+        const aOver = a.dueDate && toEndOfDay(a.dueDate) < now ? -1 : 0;
+        const bOver = b.dueDate && toEndOfDay(b.dueDate) < now ? -1 : 0;
         if (aOver !== bOver) return aOver - bOver;
         if (!a.dueDate) return 1;
         if (!b.dueDate) return -1;
@@ -279,7 +281,7 @@ export function Dashboard() {
             {myPendingTasks.length > 0 ? (
               <div className="space-y-1">
                 {myPendingTasks.map(task => {
-                  const isOverdue = task.dueDate && toLocalNoon(task.dueDate) < now;
+                  const isOverdue = task.dueDate && toEndOfDay(task.dueDate) < now;
                   const linkedProject = task.projectId ? projects.find(p => p.id === task.projectId) : null;
                   const linkedLead = task.leadId ? leads.find(l => l.id === task.leadId) : null;
 

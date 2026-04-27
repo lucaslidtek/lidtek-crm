@@ -15,6 +15,21 @@
 
 ### Tarefas Ad-Hoc
 
+#### T-AD-13: Fix — Tarefa com prazo "hoje" aparece como atrasada após 12h
+**Tipo:** Ad-hoc — solicitada em 2026-04-27
+**Descrição:** `toLocalNoon()` ancora o prazo ao meio-dia local (`T12:00:00`). Isso faz com que uma tarefa com `dueDate = hoje` seja marcada como "atrasada" a partir de 12h01 (quando `now > dueTime`). O correto é considerar o prazo como vencido apenas após 23:59:59 do dia do prazo — ou seja, a tarefa de hoje nunca deve aparecer como "atrasada" durante o mesmo dia. Fix: trocar o helper para `toEndOfDay()` que âncora em `T23:59:59` nos locais de comparação de "isOverdue".
+**Critérios de aceite:**
+- [x] Tarefa com prazo hoje NÃO aparece como atrasada em nenhum horário do dia
+- [x] Tarefa com prazo ontem aparece como atrasada
+- [x] Badge "Hoje" continua aparecendo corretamente em TaskCard
+- [x] Dashboard: tarefa de hoje vai para "tarefas para hoje", não para "atrasadas"
+- [x] type-check sem novos erros
+**Arquivos modificados:** `src/modules/dashboard/pages/Dashboard.tsx`, `src/modules/tasks/components/TaskCard.tsx`, `src/modules/tasks/components/TaskListView.tsx`
+**Sensores rodados:** [x] type-check (0 erros novos — erros pré-existentes documentados)
+**Status:** ✅ Concluído
+
+---
+
 #### T-AD-12: Fix — Ordem do Kanban não persiste após recarregar
 **Tipo:** Ad-hoc — solicitada em 2026-04-27
 **Descrição:** Quando o usuário reordena cards no Kanban de Tarefas via drag-and-drop, a nova ordem é aplicada apenas em memória (React state via `reorderTasks`). Ao recarregar, `api.tasks.list()` ordena por `created_at DESC` e a ordem volta ao padrão. Fix: adicionar coluna `position INTEGER` na tabela `tasks` do Supabase, persistir a posição via `api.tasks.reorder()` após cada drag, e ordenar por `position` (com fallback para `created_at`) na query de listagem.

@@ -25,7 +25,9 @@ export function TaskCard({ task, onEdit, onDelete, showStatusChip = false }: Tas
   let safeDateStr = task.dueDate;
   if (safeDateStr) {
     const rawDate = safeDateStr.split('T')[0];
-    safeDateStr = rawDate + 'T12:00:00';
+    // Anchor to end-of-day (23:59:59) so a task due TODAY is never "overdue"
+    // during the same day — it only becomes overdue after midnight.
+    safeDateStr = rawDate + 'T23:59:59';
   }
   const todayDateStr = new Date().toISOString().split('T')[0];
   const dueTime = safeDateStr ? new Date(safeDateStr).getTime() : null;

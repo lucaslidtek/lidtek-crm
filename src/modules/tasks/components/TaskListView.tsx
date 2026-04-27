@@ -113,9 +113,12 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                       const owners = (task.ownerIds ?? []).map(id => getUserById(id)).filter(Boolean);
                       const isDone = task.status === 'done';
                       
-                      const dueTime = task.dueDate ? new Date(task.dueDate).getTime() : null;
+                      // Anchor to end-of-day (23:59:59) — task due today is overdue only after midnight
+                      const dueEndOfDay = task.dueDate ? new Date(task.dueDate.split('T')[0] + 'T23:59:59').getTime() : null;
                       const now = Date.now();
-                      const isOverdue = !!(dueTime && dueTime < now && !isDone);
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      const isOverdue = !!(dueEndOfDay && dueEndOfDay < now && !isDone);
+                      const isToday = !isOverdue && !!task.dueDate && task.dueDate.split('T')[0] === todayStr && !isDone;
 
                       let linkedName = '';
                       let linkedType: 'project' | 'lead' | null = null;
@@ -254,7 +257,7 @@ export function TaskListView({ tasks, onEditTask, onDeleteTask }: TaskListViewPr
                                variant={
                                  isOverdue 
                                    ? 'badge-overdue' 
-                                   : task.dueDate && new Date(task.dueDate).getTime() < Date.now() + 86400000 && new Date(task.dueDate).getTime() > Date.now() 
+                                   : isToday
                                      ? 'badge-today' 
                                      : 'badge-upcoming'
                                }
