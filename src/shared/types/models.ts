@@ -139,6 +139,8 @@ export interface Task {
   projectId?: string;
   sprintId?: string;
   leadId?: string;
+  /** Drag-and-drop order within a status column. Persisted to DB. */
+  position?: number;
   createdAt: string;
   updatedAt: string;
 }

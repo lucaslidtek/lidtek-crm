@@ -238,6 +238,7 @@ export function TasksKanban() {
 
       {/* Edit Dialog */}
       <TaskEditDialog
+        key={editingTask?.id ?? 'none'}
         task={editingTask}
         open={!!editingTask}
         onOpenChange={(open) => { if (!open) setEditingTask(null); }}

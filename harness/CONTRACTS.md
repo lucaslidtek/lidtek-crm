@@ -15,6 +15,33 @@
 
 ### Tarefas Ad-Hoc
 
+#### T-AD-12: Fix — Ordem do Kanban não persiste após recarregar
+**Tipo:** Ad-hoc — solicitada em 2026-04-27
+**Descrição:** Quando o usuário reordena cards no Kanban de Tarefas via drag-and-drop, a nova ordem é aplicada apenas em memória (React state via `reorderTasks`). Ao recarregar, `api.tasks.list()` ordena por `created_at DESC` e a ordem volta ao padrão. Fix: adicionar coluna `position INTEGER` na tabela `tasks` do Supabase, persistir a posição via `api.tasks.reorder()` após cada drag, e ordenar por `position` (com fallback para `created_at`) na query de listagem.
+**Critérios de aceite:**
+- [x] Reordenar cards no Kanban persiste após recarregar a página
+- [x] Mover um card entre colunas (mudança de status) também preserva posição relativa
+- [x] Tasks sem `position` continuam funcionando (fallback para `created_at`)
+- [x] Nenhuma regressão em outras funcionalidades de tasks
+- [x] type-check sem novos erros
+**Arquivos modificados:** `supabase migration (add_task_position_column)`, `src/shared/types/models.ts`, `src/shared/lib/supabaseApi.ts`, `src/shared/lib/store.tsx`
+**Sensores rodados:** [x] migration aplicada com sucesso [x] type-check (0 erros novos — erros pré-existentes documentados)
+**Status:** ✅ Concluído
+
+---
+
+#### T-AD-11: Fix — Projetos "Cancelados" (archived) aparecem na lista principal ou somem completamente
+**Tipo:** Ad-hoc — solicitada em 2026-04-27
+**Descrição:** O status `archived` (salvo no banco como "Cancelado" na UI) nunca aparece na tabela de projetos porque `useProjects` filtra apenas `status === 'active'`. Além disso, `STATUS_OPTIONS` em `ProjectsPage` não inclui "Arquivados". Fix: excluir `archived` da listagem padrão, adicionar filtro "Arquivados" nos chips de status para que o usuário possa acessá-los quando quiser.
+**Critérios de aceite:**
+- [x] Projetos `archived` não aparecem na lista padrão (só `active` + `paused` + `completed` na listagem normal)
+- [x] Existe opção "Arquivados" no filtro de status que mostra os projetos arquivados
+- [x] Filtro "Todos" continua excluindo arquivados (comportamento padrão esperado)
+- [x] type-check sem novos erros
+**Arquivos modificados:** `src/modules/projects/hooks/useProjects.ts`, `src/modules/projects/pages/ProjectsPage.tsx`
+**Sensores rodados:** [x] type-check (0 erros novos nos arquivos modificados)
+**Status:** ✅ Concluído
+
 #### T-AD-10: Hotfix — TaskEditDialog fica travado em "Salvando..." (Realtime race condition)
 **Tipo:** Ad-hoc — solicitada em 2026-04-22
 **Descrição:** Ao salvar uma tarefa, o botão fica eternamente em "Salvando..." e o modal não fecha. Os dados são salvos no banco, mas o estado `loading` fica preso em `true`. Root cause: o Realtime subscription dispara `scheduleTasksRefresh()` ~600ms após o UPDATE no banco. Isso chama `setTasks()` no store, causando re-render do componente pai que passa um novo objeto `task` (nova referência) ao `TaskEditDialog`. O `useEffect` do dialog detecta a mudança e executa, resetando o form — **porém sem chamar `setLoading(false)`**. Se isso acontecer enquanto o `await updateTask()` ainda está pendente (esperando `refreshTasks()`), o estado de loading fica dessincronizado. Além disso, não há timeout de segurança no `updateTask` do store — se a promise travar, o dialog fica preso para sempre.
@@ -23,9 +50,9 @@
 - [ ] Botão "Salvando..." não fica preso após re-abrir o dialog
 - [ ] Se updateTask demorar mais de 10s, o usuário recebe mensagem de erro (timeout)
 - [ ] Dados continuam sendo salvos corretamente
-**Arquivos modificados:** `src/modules/tasks/components/TaskEditDialog.tsx`, `src/shared/lib/store.tsx`
+**Arquivos modificados:** `src/modules/tasks/components/TaskEditDialog.tsx`, `src/shared/lib/store.tsx`, `src/modules/tasks/pages/TasksKanban.tsx`
 **Sensores rodados:** [x] type-check (0 erros novos, erros pré-existentes documentados) [ ] lint
-**Status:** ✅ Concluído
+**Status:** ✅ Concluído (v2 — reescrita definitiva)
 
 ---
 

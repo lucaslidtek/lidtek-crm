@@ -149,6 +149,7 @@ function rowToTask(row: any): Task {
     projectId: row.project_id ?? undefined,
     sprintId: row.sprint_id ?? undefined,
     leadId: row.lead_id ?? undefined,
+    position: row.position ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -221,6 +222,7 @@ function buildTaskUpdate(updates: Partial<Task>): Record<string, any> {
   if (updates.projectId !== undefined) payload.project_id = updates.projectId;
   if (updates.sprintId !== undefined) payload.sprint_id = updates.sprintId;
   if (updates.leadId !== undefined) payload.lead_id = updates.leadId;
+  if (updates.position !== undefined) payload.position = updates.position;
   payload.updated_at = new Date().toISOString();
   return payload;
 }
@@ -681,6 +683,9 @@ export const api = {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
+        // Order by explicit position first (drag-and-drop persisted order),
+        // then fall back to created_at for tasks without a position set.
+        .order('position', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
       if (error) throw new Error(formatSupabaseError('tasks.list', error));
       return (data ?? []).map(rowToTask);
@@ -713,6 +718,7 @@ export const api = {
           project_id: input.projectId,
           sprint_id: input.sprintId,
           lead_id: input.leadId,
+          position: input.position ?? 0,
           created_at: now,
           updated_at: now,
         })
@@ -735,6 +741,19 @@ export const api = {
 
     updateStatus: async (id: string, status: TaskStatus): Promise<Task> => {
       return api.tasks.update(id, { status });
+    },
+
+    // Persist drag-and-drop order in bulk — fires after every reorder action.
+    // Each item in the array carries its new position index.
+    reorder: async (positions: { id: string; position: number }[]): Promise<void> => {
+      await Promise.all(
+        positions.map(({ id, position }) =>
+          supabase
+            .from('tasks')
+            .update({ position, updated_at: new Date().toISOString() })
+            .eq('id', id)
+        )
+      );
     },
 
     delete: async (id: string): Promise<boolean> => {

@@ -30,6 +30,7 @@ const STATUS_OPTIONS: { id: StatusFilter; label: string }[] = [
   { id: 'active', label: 'Ativos' },
   { id: 'paused', label: 'Pausados' },
   { id: 'completed', label: 'Concluídos' },
+  { id: 'archived', label: 'Arquivados' },
 ];
 
 function getProjectSortScore(project: Project): { rank: number; dueTimestamp: number } {
@@ -79,7 +80,10 @@ export function ProjectsPage() {
   const filteredProjects = useMemo(() => {
     let result = projects;
 
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'all') {
+      // Default view: hide archived projects
+      result = result.filter(p => p.status !== 'archived');
+    } else {
       result = result.filter(p => p.status === statusFilter);
     }
 
@@ -107,7 +111,15 @@ export function ProjectsPage() {
   const filteredProjectsByStage = useMemo(() => {
     let stageProjects = projectsByStage;
 
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'all') {
+      // Default view: hide archived projects
+      stageProjects = Object.fromEntries(
+        Object.entries(stageProjects).map(([stage, projects]) => [
+          stage,
+          projects.filter(p => p.status !== 'archived'),
+        ])
+      );
+    } else {
       stageProjects = Object.fromEntries(
         Object.entries(stageProjects).map(([stage, projects]) => [
           stage,

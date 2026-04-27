@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/shared/components/ui/Dialog';
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { Button } from '@/shared/components/ui/Button';
@@ -32,24 +32,39 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Seed form with task data when task changes
+  // Track the task ID that was seeded into the form so we only re-seed
+  // when a *different* task is opened, never mid-save.
+  const seededTaskIdRef = useRef<string | null>(null);
+
+  // Seed form whenever a new (different) task is opened.
+  // Using 'open' AND 'task?.id' as dependencies ensures:
+  //  - Form resets when a different task is selected.
+  //  - Realtime store updates (which don't change task.id) do NOT re-run
+  //    this effect and do NOT reset loading mid-save.
   useEffect(() => {
-    if (task) {
-      setTitle(task.title);
-      setType(task.type);
-      setPriority(task.priority);
-      setOwnerIds(task.ownerIds ?? []);
-      setDueDate(task.dueDate ? task.dueDate.split('T')[0] ?? '' : '');
-      setDescription(task.description ?? '');
-      setProjectId(task.projectId ?? '');
-      setLeadId(task.leadId ?? '');
-      setError(null);
-      setShowDeleteConfirm(false);
-      // CRITICAL: always reset loading when task changes (Realtime may re-trigger
-      // this effect while a save is in flight, leaving loading stuck at true)
-      setLoading(false);
+    if (!open || !task) return;
+    if (seededTaskIdRef.current === task.id) return; // same task, already seeded
+
+    seededTaskIdRef.current = task.id;
+    setTitle(task.title);
+    setType(task.type);
+    setPriority(task.priority);
+    setOwnerIds(task.ownerIds ?? []);
+    setDueDate(task.dueDate ? task.dueDate.split('T')[0] ?? '' : '');
+    setDescription(task.description ?? '');
+    setProjectId(task.projectId ?? '');
+    setLeadId(task.leadId ?? '');
+    setError(null);
+    setShowDeleteConfirm(false);
+    setLoading(false); // safe here — we only reach this when opening a NEW task
+  }, [open, task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset seeded ref when dialog closes so reopening same task re-seeds form
+  useEffect(() => {
+    if (!open) {
+      seededTaskIdRef.current = null;
     }
-  }, [task]);
+  }, [open]);
 
   const isValid = title.trim();
 
@@ -98,8 +113,6 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
       setDeleting(false);
     }
   };
-
-  if (!task) return null;
 
   return (
     <>
@@ -200,7 +213,7 @@ export function TaskEditDialog({ task, open, onOpenChange }: TaskEditDialogProps
         onOpenChange={setShowDeleteConfirm}
         onConfirm={handleConfirmDelete}
         title="Excluir tarefa"
-        description={`Tem certeza que deseja excluir "${task.title}"? Essa ação não pode ser desfeita.`}
+        description={`Tem certeza que deseja excluir "${task?.title ?? ''}"? Essa ação não pode ser desfeita.`}
         confirmLabel="Excluir"
         variant="danger"
         loading={deleting}

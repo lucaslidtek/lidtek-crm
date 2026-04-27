@@ -955,7 +955,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTasks(current => {
       const subsetIds = new Set(reorderedSubset.map(i => i.id));
       const excluded = current.filter(i => !subsetIds.has(i.id));
-      return [...reorderedSubset, ...excluded];
+      const next = [...reorderedSubset, ...excluded];
+
+      // Persist new positions to DB in background (fire-and-forget)
+      // Assign position index scoped per status column
+      const positionsByStatus = new Map<string, number>();
+      const positions: { id: string; position: number }[] = [];
+      for (const task of next) {
+        const current = positionsByStatus.get(task.status) ?? 0;
+        positions.push({ id: task.id, position: current });
+        positionsByStatus.set(task.status, current + 1);
+      }
+      api.tasks.reorder(positions).catch(err =>
+        console.warn('[Store] reorderTasks persist failed:', err)
+      );
+
+      // Update in-memory cache to reflect new order
+      if (_cache) {
+        _cache.tasks = next;
+        persistCache(_cache);
+      }
+
+      return next;
     });
   }, []);
 
